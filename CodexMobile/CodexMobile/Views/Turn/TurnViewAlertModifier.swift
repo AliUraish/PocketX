@@ -13,8 +13,8 @@ private struct TurnViewAlertModifier: ViewModifier {
     @Binding var isShowingMacHandoffConfirm: Bool
     @Binding var macHandoffErrorMessage: String?
 
-    let onDeclineApproval: () -> Void
-    let onApproveApproval: () -> Void
+    let onDeclineApproval: (CodexApprovalRequest) -> Void
+    let onApproveApproval: (CodexApprovalRequest) -> Void
     let onConfirmGitSyncAction: (TurnGitSyncAlertAction) -> Void
     let onDismissGitSyncAlert: () -> Void
     let onConfirmMacHandoff: () -> Void
@@ -27,12 +27,18 @@ private struct TurnViewAlertModifier: ViewModifier {
                 presenting: alertApprovalRequest
             ) { _ in
                 Button("Decline", role: .destructive) {
+                    let request = alertApprovalRequest
                     alertApprovalRequest = nil
-                    onDeclineApproval()
+                    if let request {
+                        onDeclineApproval(request)
+                    }
                 }
                 Button("Approve") {
+                    let request = alertApprovalRequest
                     alertApprovalRequest = nil
-                    onApproveApproval()
+                    if let request {
+                        onApproveApproval(request)
+                    }
                 }
             } message: { request in
                 Text(approvalAlertMessage(for: request))
@@ -153,8 +159,8 @@ extension View {
         gitSyncAlert: Binding<TurnGitSyncAlert?>,
         isShowingMacHandoffConfirm: Binding<Bool>,
         macHandoffErrorMessage: Binding<String?>,
-        onDeclineApproval: @escaping () -> Void,
-        onApproveApproval: @escaping () -> Void,
+        onDeclineApproval: @escaping (CodexApprovalRequest) -> Void,
+        onApproveApproval: @escaping (CodexApprovalRequest) -> Void,
         onConfirmGitSyncAction: @escaping (TurnGitSyncAlertAction) -> Void,
         onDismissGitSyncAlert: @escaping () -> Void,
         onConfirmMacHandoff: @escaping () -> Void
