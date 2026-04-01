@@ -1,5 +1,5 @@
 // FILE: session-state.js
-// Purpose: Persists the latest active Remodex thread so the user can reopen it on the Mac for handoff.
+// Purpose: Persists the latest active rimcodex thread so the user can reopen it on the Mac for handoff.
 // Layer: CLI helper
 // Exports: rememberActiveThread, openLastActiveThread, readLastActiveThread
 // Depends on: fs, os, path, child_process
@@ -9,7 +9,7 @@ const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-const STATE_DIR = path.join(os.homedir(), ".remodex");
+const STATE_DIR = path.join(os.homedir(), ".rimcodex");
 const STATE_FILE = path.join(STATE_DIR, "last-thread.json");
 const DEFAULT_BUNDLE_ID = "com.openai.codex";
 
@@ -33,7 +33,7 @@ function openLastActiveThread({ bundleId = DEFAULT_BUNDLE_ID } = {}) {
   const state = readState();
   const threadId = state?.threadId;
   if (!threadId) {
-    throw new Error("No remembered Remodex thread found yet.");
+    throw new Error("No remembered rimcodex thread found yet.");
   }
 
   const targetUrl = `codex://threads/${threadId}`;
