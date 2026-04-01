@@ -50,6 +50,28 @@ function createPushNotificationServiceClient({
     });
   }
 
+  async function notifyEvent({
+    eventType,
+    threadId,
+    turnId,
+    title,
+    body,
+    dedupeKey,
+    eventPayload,
+  } = {}) {
+    return postJSON("/v1/push/session/notify-event", {
+      sessionId,
+      notificationSecret,
+      eventType,
+      threadId,
+      turnId,
+      title,
+      body,
+      dedupeKey,
+      eventPayload,
+    });
+  }
+
   async function postJSON(pathname, payload) {
     if (!normalizedBaseUrl || typeof fetchImpl !== "function") {
       return { ok: false, skipped: true };
@@ -103,6 +125,7 @@ function createPushNotificationServiceClient({
     hasConfiguredBaseUrl: Boolean(normalizedBaseUrl),
     registerDevice,
     notifyCompletion,
+    notifyEvent,
     logUnavailable() {
       if (!normalizedBaseUrl) {
         console.log(`${logPrefix} push notifications disabled: no push service URL configured`);
