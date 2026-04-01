@@ -316,12 +316,6 @@ private enum SidebarRowPreviewFixtures {
         "t3": TurnSessionDiffTotals(additions: 120, deletions: 55, distinctDiffCount: 12),
     ]
 
-    static func timingLabel(for thread: CodexThread) -> String? {
-        guard let updated = thread.updatedAt else { return nil }
-        let seconds = Int(now.timeIntervalSince(updated))
-        if seconds < 60 { return "\(seconds)s" }
-        return "\(seconds / 60)m"
-    }
 }
 
 #Preview("Sidebar with Subagents") {
@@ -332,7 +326,7 @@ private enum SidebarRowPreviewFixtures {
         groups: SidebarRowPreviewFixtures.groups,
         selectedThread: SidebarRowPreviewFixtures.allThreads[2], // Locke selected
         bottomContentInset: 80,
-        timingLabelProvider: SidebarRowPreviewFixtures.timingLabel,
+        timingLabelProvider: { SidebarRelativeTimeFormatter.compactLabel(for: $0, now: SidebarRowPreviewFixtures.now) },
         diffTotalsByThreadID: SidebarRowPreviewFixtures.diffTotals,
         runBadgeStateByThreadID: SidebarRowPreviewFixtures.runBadges,
         onSelectThread: { _ in },
