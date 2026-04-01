@@ -56,6 +56,24 @@ function createBridgeApprovalStateStore({
       return entries.length;
     },
 
+    clearPendingApprovals(reason = "cleared") {
+      const normalizedReason = normalizeNonEmptyString(reason) || "cleared";
+      if (state.pendingApprovals.length === 0) {
+        return false;
+      }
+
+      const recordedAt = now();
+      state.auditLog = state.auditLog.concat(
+        state.pendingApprovals.map((entry) => buildAuditEntry("cleared", entry, {
+          recordedAt,
+          outcome: normalizedReason,
+        }))
+      ).slice(-MAX_APPROVAL_AUDIT_ENTRIES);
+      state.pendingApprovals = [];
+      persist();
+      return true;
+    },
+
     expirePendingApproval(requestId, reason = "expired") {
       const normalizedRequestId = normalizeNonEmptyString(requestId);
       if (!normalizedRequestId) {
