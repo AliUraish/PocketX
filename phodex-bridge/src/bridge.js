@@ -31,6 +31,7 @@ const { createPushNotificationServiceClient } = require("./push-notification-ser
 const { createPushNotificationTracker } = require("./push-notification-tracker");
 const { createBridgeApprovalStateStore } = require("./approval-state");
 const { createBridgeEventLogStore } = require("./event-log");
+const { createBridgeRuntimeCapabilitiesReader } = require("./runtime-capabilities");
 const {
   loadOrCreateBridgeDeviceState,
   resolveBridgeRelaySession,
@@ -203,6 +204,10 @@ function startBridge({
     env: process.env,
     logPrefix: "[rimcodex]",
   });
+  const readBridgeRuntimeCapabilities = createBridgeRuntimeCapabilitiesReader({
+    sendCodexRequest,
+    canReadLocalCodexVersion: !config.codexEndpoint,
+  });
   const voiceHandler = createVoiceHandler({
     sendCodexRequest,
     logPrefix: "[rimcodex]",
@@ -215,6 +220,7 @@ function startBridge({
   });
 
   codex.onError((error) => {
+    readBridgeRuntimeCapabilities.invalidate();
     codexSupervisorState = "error";
     codexSupervisorLastError = error.message;
     codexSupervisorNextRetryAt = 0;
@@ -242,6 +248,7 @@ function startBridge({
   });
 
   codex.onSupervisorEvent?.((event) => {
+    readBridgeRuntimeCapabilities.invalidate();
     codexHandshakeState = "cold";
     codexSupervisorState = event?.state || codexSupervisorState;
     codexSupervisorRestartCount = Number.isFinite(event?.attempt) ? event.attempt : codexSupervisorRestartCount;
@@ -676,11 +683,17 @@ function startBridge({
     }
 
     if (method === "bridge/capabilities") {
-      readBridgePackageVersionStatus()
-        .then((packageVersionStatus) => {
+      Promise.all([
+        readBridgePackageVersionStatus(),
+        readBridgeRuntimeCapabilities.readSnapshot(),
+      ])
+        .then(([packageVersionStatus, runtimeCapabilitySnapshot]) => {
           sendResponse(JSON.stringify({
             id: requestId,
-            result: buildBridgeCapabilities({ packageVersionStatus }),
+            result: buildBridgeCapabilities({
+              packageVersionStatus,
+              runtimeCapabilitySnapshot,
+            }),
           }));
         })
         .catch((error) => {
@@ -1276,6 +1289,7 @@ function startBridge({
   }
 
   function handleCodexRuntimeRestart(error) {
+    readBridgeRuntimeCapabilities.invalidate();
     stopContextUsageWatcher();
     rolloutLiveMirror?.stopAll();
     desktopRefresher.handleTransportReset();
