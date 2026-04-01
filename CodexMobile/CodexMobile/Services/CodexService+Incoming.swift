@@ -193,6 +193,11 @@ extension CodexService {
                         await self?.refreshPendingApprovals()
                     }
                 }
+                if isBridgeProtocolAvailable {
+                    Task { @MainActor [weak self] in
+                        await self?.refreshBridgeDiagnostics()
+                    }
+                }
             }
 
         case "thread/started":
