@@ -1,7 +1,7 @@
 // FILE: relay.js
-// Purpose: Thin self-hostable WebSocket relay for Remodex pairing, trusted-session lookup, and encrypted forwarding.
+// Purpose: Thin self-hostable WebSocket relay for rimcodex pairing, trusted-session lookup, and encrypted forwarding.
 // Layer: Standalone server module
-// Exports: setupRelay, getRelayStats, hasActiveMacSession, hasAuthenticatedMacSession, resolveTrustedMacSession
+// Exports: setupRelay, getRelayStats, hasActiveMacSession, hasAuthenticatedMacSession, resolveTrustedMacSession, claimPairingCode
 
 const { createHash, createPublicKey, verify } = require("crypto");
 const { WebSocket } = require("ws");
@@ -12,13 +12,14 @@ const CLOSE_CODE_SESSION_UNAVAILABLE = 4002;
 const CLOSE_CODE_IPHONE_REPLACED = 4003;
 const CLOSE_CODE_MAC_ABSENCE_BUFFER_FULL = 4004;
 const MAC_ABSENCE_GRACE_MS = 15_000;
-const TRUSTED_SESSION_RESOLVE_TAG = "remodex-trusted-session-resolve-v1";
+const TRUSTED_SESSION_RESOLVE_TAG = "rimcodex-trusted-session-resolve-v1";
 const TRUSTED_SESSION_RESOLVE_SKEW_MS = 90_000;
 
 // In-memory session registry for one Mac host and one live iPhone client per session.
 const sessions = new Map();
 const liveSessionsByMacDeviceId = new Map();
 const usedResolveNonces = new Map();
+const pendingPairingsByCode = new Map();
 
 // Attaches relay behavior to a ws WebSocketServer instance.
 function setupRelay(
@@ -73,6 +74,7 @@ function setupRelay(
         cleanupTimer: null,
         macAbsenceTimer: null,
         notificationSecret: null,
+        pairingSession: null,
       });
     }
 
@@ -151,6 +153,7 @@ function setupRelay(
       if (role === "mac") {
         if (session.mac === ws) {
           session.mac = null;
+          clearSessionPairing(sessionId, session);
           unregisterLiveMacSession(session.macRegistration, sessionId);
           console.log(`[relay] Mac disconnected -> ${relaySessionLogLabel(sessionId)}`);
           if (session.clients.size > 0) {
@@ -200,6 +203,7 @@ function scheduleCleanup(sessionId, { setTimeoutFn = setTimeout } = {}) {
       && !activeSession.macAbsenceTimer
     ) {
       unregisterLiveMacSession(activeSession.macRegistration, sessionId);
+      clearSessionPairing(sessionId, activeSession);
       sessions.delete(sessionId);
       console.log(`[relay] ${relaySessionLogLabel(sessionId)} cleaned up`);
     }
@@ -228,6 +232,7 @@ function scheduleMacAbsenceTimeout(
 
     activeSession.macAbsenceTimer = null;
     activeSession.notificationSecret = null;
+    clearSessionPairing(sessionId, activeSession);
     unregisterLiveMacSession(activeSession.macRegistration, sessionId);
     closeSessionClients(activeSession, CLOSE_CODE_SESSION_UNAVAILABLE, "Mac disconnected");
     scheduleCleanup(sessionId, { setTimeoutFn });
@@ -359,6 +364,40 @@ function resolveTrustedMacSession({
   };
 }
 
+function claimPairingCode({
+  pairingCode,
+  now = Date.now(),
+} = {}) {
+  pruneExpiredPendingPairings(now);
+
+  const normalizedPairingCode = normalizePairingCode(pairingCode);
+  if (!normalizedPairingCode) {
+    throw createRelayError(400, "invalid_pairing_code", "The pairing code is missing or invalid.");
+  }
+
+  const pendingPairing = pendingPairingsByCode.get(normalizedPairingCode);
+  if (!pendingPairing) {
+    throw createRelayError(404, "invalid_pairing_code", "That pairing code was not found.");
+  }
+
+  const session = sessions.get(pendingPairing.sessionId);
+  if (!session || !hasActiveMacSession(pendingPairing.sessionId)) {
+    clearSessionPairing(pendingPairing.sessionId, session);
+    throw createRelayError(404, "pairing_unavailable", "The Mac bridge for this pairing code is offline.");
+  }
+
+  if (now > pendingPairing.expiresAt) {
+    clearSessionPairing(pendingPairing.sessionId, session);
+    throw createRelayError(410, "pairing_expired", "This pairing code has expired.");
+  }
+
+  clearSessionPairing(pendingPairing.sessionId, session);
+  return {
+    ok: true,
+    pairing: pendingPairing.pairingPayload,
+  };
+}
+
 // Exposes lightweight runtime stats for health/status endpoints.
 function getRelayStats() {
   let totalClients = 0;
@@ -374,6 +413,7 @@ function getRelayStats() {
   return {
     activeSessions: sessions.size,
     sessionsWithMac,
+    pendingPairings: pendingPairingsByCode.size,
     totalClients,
   };
 }
@@ -413,6 +453,7 @@ function applyMacRegistrationMessage(session, sessionId, rawMessage) {
 
   session.macRegistration = normalizeMacRegistration(parsed.registration, sessionId);
   registerLiveMacSession(session.macRegistration);
+  applyPairingSessionRegistration(session, sessionId, parsed.pairingSession);
   return true;
 }
 
@@ -446,6 +487,76 @@ function normalizeMacRegistration(registration, sessionId) {
     displayName: normalizeNonEmptyString(registration?.displayName),
     trustedPhoneDeviceId: normalizeNonEmptyString(registration?.trustedPhoneDeviceId),
     trustedPhonePublicKey: normalizeNonEmptyString(registration?.trustedPhonePublicKey),
+  };
+}
+
+function applyPairingSessionRegistration(session, sessionId, pairingSession) {
+  clearSessionPairing(sessionId, session);
+
+  const normalizedPairingSession = normalizePairingSessionRegistration(pairingSession, sessionId);
+  if (!normalizedPairingSession) {
+    return;
+  }
+
+  session.pairingSession = normalizedPairingSession;
+  pendingPairingsByCode.set(normalizedPairingSession.pairingCode, normalizedPairingSession);
+}
+
+function clearSessionPairing(sessionId, session) {
+  const activeSession = session || sessions.get(sessionId);
+  const pairingCode = activeSession?.pairingSession?.pairingCode;
+  if (pairingCode) {
+    pendingPairingsByCode.delete(pairingCode);
+  }
+  if (activeSession) {
+    activeSession.pairingSession = null;
+  }
+}
+
+function normalizePairingSessionRegistration(pairingSession, sessionId) {
+  const normalizedPairingCode = normalizePairingCode(pairingSession?.pairingCode);
+  const expiresAt = Number(pairingSession?.expiresAt);
+  const pairingPayload = normalizePairingPayload(pairingSession?.pairingPayload, sessionId);
+
+  if (!normalizedPairingCode || !Number.isFinite(expiresAt) || !pairingPayload) {
+    return null;
+  }
+
+  return {
+    pairingSessionId: normalizeNonEmptyString(pairingSession?.pairingSessionId),
+    pairingCode: normalizedPairingCode,
+    expiresAt,
+    sessionId,
+    pairingPayload,
+  };
+}
+
+function normalizePairingPayload(pairingPayload, sessionId) {
+  const normalizedSessionId = normalizeNonEmptyString(pairingPayload?.sessionId);
+  const relay = normalizeNonEmptyString(pairingPayload?.relay);
+  const macDeviceId = normalizeNonEmptyString(pairingPayload?.macDeviceId);
+  const macIdentityPublicKey = normalizeNonEmptyString(pairingPayload?.macIdentityPublicKey);
+  const expiresAt = Number(pairingPayload?.expiresAt);
+  const version = Number(pairingPayload?.v);
+
+  if (
+    normalizedSessionId !== sessionId
+    || !relay
+    || !macDeviceId
+    || !macIdentityPublicKey
+    || !Number.isFinite(expiresAt)
+    || !Number.isFinite(version)
+  ) {
+    return null;
+  }
+
+  return {
+    v: version,
+    relay,
+    sessionId,
+    macDeviceId,
+    macIdentityPublicKey,
+    expiresAt,
   };
 }
 
@@ -494,6 +605,18 @@ function pruneUsedResolveNonces(now) {
   }
 }
 
+function pruneExpiredPendingPairings(now) {
+  for (const [pairingCode, pendingPairing] of pendingPairingsByCode.entries()) {
+    if (now >= pendingPairing.expiresAt) {
+      pendingPairingsByCode.delete(pairingCode);
+      const session = sessions.get(pendingPairing.sessionId);
+      if (session?.pairingSession?.pairingCode === pairingCode) {
+        session.pairingSession = null;
+      }
+    }
+  }
+}
+
 function encodeLengthPrefixedUTF8(value) {
   return encodeLengthPrefixedData(Buffer.from(value, "utf8"));
 }
@@ -513,6 +636,13 @@ function base64ToBase64Url(value) {
 
 function normalizeNonEmptyString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function normalizePairingCode(value) {
+  const normalized = normalizeNonEmptyString(value)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+  return normalized;
 }
 
 function createRelayError(status, code, message) {
@@ -540,6 +670,7 @@ function safeParseJSON(value) {
 }
 
 module.exports = {
+  claimPairingCode,
   setupRelay,
   getRelayStats,
   hasActiveMacSession,
