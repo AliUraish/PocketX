@@ -173,6 +173,7 @@ extension CodexService {
         hasResolvedRateLimitsSnapshot = false
         bridgeInstalledVersion = nil
         latestBridgePackageVersion = nil
+        bridgeCodexVersion = nil
         clearConnectionSyncState()
         clearHydrationCaches()
         resumedThreadIDs.removeAll()
@@ -270,7 +271,10 @@ extension CodexService {
 
         do {
             _ = try await sendRequest(method: "initialize", params: modernParams)
-            supportsTurnCollaborationMode = await runtimeSupportsPlanCollaborationMode()
+            await refreshBridgeProtocolAvailability()
+            if !isBridgeProtocolAvailable {
+                supportsTurnCollaborationMode = await runtimeSupportsPlanCollaborationMode()
+            }
         } catch {
             guard shouldRetryInitializeWithoutCapabilities(error) else {
                 throw error
@@ -283,8 +287,12 @@ extension CodexService {
             supportsTurnCollaborationMode = false
         }
 
+        if case .unknown = bridgeProtocolAvailability {
+            await refreshBridgeProtocolAvailability()
+        }
+
         try await sendNotification(method: "initialized", params: nil)
-        await refreshBridgeProtocolState()
+        await refreshBridgeHealthState()
         isInitialized = true
     }
 
@@ -423,6 +431,7 @@ extension CodexService {
         supportsTurnCollaborationMode = false
         bridgeInstalledVersion = nil
         latestBridgePackageVersion = nil
+        bridgeCodexVersion = nil
         resumedThreadIDs.removeAll()
         clearHydrationCaches()
         resetSecureTransportState()
