@@ -165,6 +165,11 @@ struct SettingsView: View {
                 }
             }
 
+            if !codex.pendingApprovalRequests.isEmpty {
+                Divider()
+                pendingApprovalsSection
+            }
+
             if case .retrying(_, let message) = codex.connectionRecoveryState,
                !message.isEmpty {
                 Text(message)
@@ -227,6 +232,65 @@ struct SettingsView: View {
         case .offline, .connected:
             return ""
         }
+    }
+
+    @ViewBuilder private var pendingApprovalsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Pending approvals")
+                .font(AppFont.caption(weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(codex.pendingApprovalRequests) { request in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(approvalSummary(for: request))
+                        .font(AppFont.caption())
+                        .foregroundStyle(.primary)
+
+                    if let command = request.command?.trimmingCharacters(in: .whitespacesAndNewlines),
+                       !command.isEmpty {
+                        Text(command)
+                            .font(AppFont.caption().monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 10) {
+                        Button("Decline", role: .destructive) {
+                            HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                            Task { @MainActor in
+                                try? await codex.declinePendingRequest(request)
+                            }
+                        }
+                        .buttonStyle(.borderless)
+
+                        Button("Approve") {
+                            HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                            Task { @MainActor in
+                                try? await codex.approvePendingRequest(request)
+                            }
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+
+                if request.id != codex.pendingApprovalRequests.last?.id {
+                    Divider()
+                }
+            }
+        }
+    }
+
+    private func approvalSummary(for request: CodexApprovalRequest) -> String {
+        let trimmedReason = request.reason?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmedReason.isEmpty {
+            return trimmedReason
+        }
+
+        if let threadId = request.threadId?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !threadId.isEmpty {
+            return "Approval needed for thread \(threadId)"
+        }
+
+        return "Codex is requesting permission to continue."
     }
 
     // MARK: - Actions
