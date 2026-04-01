@@ -14,25 +14,25 @@ extension CodexService {
         guard let sessionId = normalizedRelaySessionId,
               let macDeviceId = normalizedRelayMacDeviceId else {
             throw CodexSecureTransportError.invalidHandshake(
-                "The saved relay pairing is incomplete. Scan a fresh QR code to reconnect."
+                "The saved relay pairing is incomplete. Enter a fresh pairing code to reconnect."
             )
         }
 
         let trustedMac = trustedMacRegistry.records[macDeviceId]
-        // Fresh QR scans must go through bootstrap once so we verify the scanned session,
+        // Fresh pairing sessions must go through bootstrap once so we verify the claimed session,
         // instead of silently reusing an older trusted-reconnect path.
         let handshakeMode: CodexSecureHandshakeMode = (!shouldForceQRBootstrapOnNextHandshake && trustedMac != nil)
             ? .trustedReconnect
-            : .qrBootstrap
+            : .pairingBootstrap
         let expectedMacIdentityPublicKey: String
         switch handshakeMode {
         case .trustedReconnect:
             expectedMacIdentityPublicKey = trustedMac?.macIdentityPublicKey ?? ""
             secureConnectionState = .reconnecting
-        case .qrBootstrap:
+        case .pairingBootstrap:
             guard let pairingPublicKey = normalizedRelayMacIdentityPublicKey else {
                 throw CodexSecureTransportError.invalidHandshake(
-                    "The initial pairing metadata is missing the Mac identity key. Scan a new QR code to reconnect."
+                    "The initial pairing metadata is missing the Mac identity key. Enter a new pairing code to reconnect."
                 )
             }
             expectedMacIdentityPublicKey = pairingPublicKey
@@ -70,10 +70,10 @@ extension CodexService {
         )
         guard serverHello.protocolVersion == codexSecureProtocolVersion else {
             presentBridgeUpdatePrompt(
-                message: "This bridge is using a different secure transport version. Update the Remodex package on your Mac and try again."
+                message: "This bridge is using a different secure transport version. Update the rimcodex package on your Mac and try again."
             )
             throw CodexSecureTransportError.incompatibleVersion(
-                "This bridge is using a different secure transport version. Update Remodex on the iPhone or Mac and try again."
+                "This bridge is using a different secure transport version. Update rimcodex on the iPhone or Mac and try again."
             )
         }
         guard serverHello.sessionId == sessionId else {
@@ -185,7 +185,7 @@ extension CodexService {
         secureMacFingerprint = codexSecureFingerprint(for: serverHello.macIdentityPublicKey)
         bridgeUpdatePrompt = nil
 
-        if handshakeMode == .qrBootstrap {
+        if handshakeMode == .pairingBootstrap {
             trustMac(
                 deviceId: macDeviceId,
                 publicKey: serverHello.macIdentityPublicKey,
@@ -225,7 +225,7 @@ extension CodexService {
     func secureWireText(for plaintext: String) throws -> String {
         guard var secureSession else {
             throw CodexSecureTransportError.invalidHandshake(
-                "The secure Remodex session is not ready yet. Try reconnecting."
+                "The secure rimcodex session is not ready yet. Try reconnecting."
             )
         }
 
@@ -251,13 +251,13 @@ extension CodexService {
         self.secureSession = secureSession
         let data = try JSONEncoder().encode(envelope)
         guard let text = String(data: data, encoding: .utf8) else {
-            throw CodexSecureTransportError.invalidHandshake("Unable to encode the secure Remodex envelope.")
+            throw CodexSecureTransportError.invalidHandshake("Unable to encode the secure rimcodex envelope.")
         }
         return text
     }
 
-    // Saves the QR-derived bridge metadata used for secure reconnects.
-    func rememberRelayPairing(_ payload: CodexPairingQRPayload) {
+    // Saves the bridge metadata used for initial pairing bootstrap and later trusted reconnects.
+    func rememberRelayPairing(_ payload: CodexPairingBootstrapPayload) {
         SecureStore.writeString(payload.sessionId, for: CodexSecureKeys.relaySessionId)
         SecureStore.writeString(payload.relay, for: CodexSecureKeys.relayUrl)
         SecureStore.writeString(payload.macDeviceId, for: CodexSecureKeys.relayMacDeviceId)
@@ -274,6 +274,94 @@ extension CodexService {
         trustedReconnectFailureCount = 0
         secureConnectionState = trustedMacRegistry.records[payload.macDeviceId] == nil ? .handshaking : .trustedMac
         secureMacFingerprint = codexSecureFingerprint(for: payload.macIdentityPublicKey)
+    }
+
+    func claimPairingCode(
+        pairingCode: String,
+        relayURL: String,
+        deviceName: String?
+    ) async throws -> CodexPairingBootstrapPayload {
+        let normalizedRelayURL = relayURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedRelayURL.isEmpty else {
+            throw CodexPairingCodeClaimError.missingRelayURL
+        }
+        guard let claimURL = pairingCodeClaimURL(from: normalizedRelayURL) else {
+            throw CodexPairingCodeClaimError.invalidRelayURL
+        }
+
+        let normalizedPairingCode = pairingCode
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+            .replacingOccurrences(of: "[^A-Z0-9]", with: "", options: .regularExpression)
+        guard !normalizedPairingCode.isEmpty else {
+            throw CodexPairingCodeClaimError.invalidCode
+        }
+
+        let normalizedDeviceName: String? = {
+            let value = deviceName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return value.isEmpty ? nil : value
+        }()
+
+        var request = URLRequest(url: claimURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 8
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(
+            CodexPairingCodeClaimRequest(
+                pairingCode: normalizedPairingCode,
+                deviceName: normalizedDeviceName
+            )
+        )
+
+        let session = relayControlURLSession(for: claimURL)
+        defer { session.invalidateAndCancel() }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw CodexPairingCodeClaimError.network(
+                "Could not reach the relay for this pairing code. Check the relay URL and try again."
+            )
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw CodexPairingCodeClaimError.invalidResponse("The relay returned an invalid response.")
+        }
+
+        if (200..<300).contains(httpResponse.statusCode) {
+            guard let claimed = try? JSONDecoder().decode(CodexPairingCodeClaimResponse.self, from: data),
+                  claimed.ok else {
+                throw CodexPairingCodeClaimError.invalidResponse("The relay returned malformed pairing data.")
+            }
+            guard claimed.pairing.v == codexPairingProtocolVersion else {
+                throw CodexPairingCodeClaimError.invalidResponse(
+                    "This pairing code was generated by a different bridge version. Update the bridge and try again."
+                )
+            }
+            return claimed.pairing
+        }
+
+        let errorResponse = try? JSONDecoder().decode(CodexRelayErrorResponse.self, from: data)
+        switch errorResponse?.code {
+        case "invalid_pairing_code":
+            throw CodexPairingCodeClaimError.invalidCode
+        case "pairing_expired":
+            throw CodexPairingCodeClaimError.expired(
+                errorResponse?.error ?? "This pairing code has expired. Generate a new one on your Mac."
+            )
+        case "pairing_unavailable":
+            throw CodexPairingCodeClaimError.unavailable(
+                errorResponse?.error ?? "The Mac bridge for this pairing code is offline."
+            )
+        default:
+            throw CodexPairingCodeClaimError.network(
+                errorResponse?.error ?? "The relay could not claim this pairing code."
+            )
+        }
     }
 
     // Resets volatile secure state while preserving the trusted-device registry.
@@ -351,7 +439,7 @@ extension CodexService {
         }
     }
 
-    // Lets manual reconnect / fresh QR pairing preempt a stuck trusted-session HTTP lookup.
+    // Lets manual reconnect or fresh pairing preempt a stuck trusted-session HTTP lookup.
     func cancelTrustedSessionResolve() {
         trustedSessionResolveTask?.cancel()
         trustedSessionResolveTask = nil
@@ -374,16 +462,16 @@ private extension CodexService {
     // Centralizes the bridge-update guidance so every mismatch shows the same Mac command.
     func presentBridgeUpdatePrompt(message: String) {
         bridgeUpdatePrompt = CodexBridgeUpdatePrompt(
-            title: "Update the Remodex package on your Mac",
+            title: "Update the rimcodex package on your Mac",
             message: message,
-            command: "npm install -g remodex@latest"
+            command: "npm install -g rimcodex@latest"
         )
     }
 
     func sendWireControlMessage<Value: Encodable>(_ value: Value) async throws {
         let data = try JSONEncoder().encode(value)
         guard let text = String(data: data, encoding: .utf8) else {
-            throw CodexSecureTransportError.invalidHandshake("Unable to encode the secure Remodex control payload.")
+            throw CodexSecureTransportError.invalidHandshake("Unable to encode the secure rimcodex control payload.")
         }
         try await sendRawText(text)
     }
@@ -402,7 +490,7 @@ private extension CodexService {
         }
 
         let waiterID = UUID()
-        let timeoutMessage = "Timed out waiting for the secure Remodex \(kind) message."
+        let timeoutMessage = "Timed out waiting for the secure rimcodex \(kind) message."
 
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
             pendingSecureControlContinuations[kind, default: []].append(
@@ -492,7 +580,7 @@ private extension CodexService {
               envelope.keyEpoch == secureSession.keyEpoch,
               envelope.sender == "mac",
               envelope.counter > secureSession.lastInboundCounter else {
-            lastErrorMessage = "The secure Remodex payload could not be verified."
+            lastErrorMessage = "The secure rimcodex payload could not be verified."
             secureConnectionState = .rePairRequired
             return
         }
@@ -590,7 +678,7 @@ private extension CodexService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(requestBody)
 
-        let session = trustedSessionResolveURLSession(for: resolveURL)
+        let session = relayControlURLSession(for: resolveURL)
         defer { session.invalidateAndCancel() }
 
         let data: Data
@@ -629,7 +717,7 @@ private extension CodexService {
         case "phone_not_trusted", "invalid_signature":
             secureConnectionState = .rePairRequired
             throw CodexTrustedSessionResolveError.rePairRequired(
-                "This iPhone is no longer trusted by the Mac. Scan a new QR code to reconnect."
+                "This iPhone is no longer trusted by the Mac. Enter a new pairing code to reconnect."
             )
         case "resolve_request_replayed", "resolve_request_expired":
             throw CodexTrustedSessionResolveError.network(
@@ -697,9 +785,31 @@ private extension CodexService {
         return components.url
     }
 
+    private func pairingCodeClaimURL(from relayURL: String) -> URL? {
+        guard var components = URLComponents(string: relayURL) else {
+            return nil
+        }
+
+        if components.scheme == "wss" {
+            components.scheme = "https"
+        } else if components.scheme == "ws" {
+            components.scheme = "http"
+        }
+
+        let pathComponents = components.path.split(separator: "/").map(String.init)
+        if pathComponents.last == "relay" {
+            let prefix = pathComponents.dropLast()
+            components.path = "/" + (prefix + ["v1", "pairing", "code", "claim"]).joined(separator: "/")
+        } else {
+            components.path = "/v1/pairing/code/claim"
+        }
+
+        return components.url
+    }
+
     // Uses a non-proxying URLSession for local/private-overlay relays so trusted reconnect
-    // avoids the same iOS proxy path that can break direct websocket pairing.
-    private func trustedSessionResolveURLSession(for url: URL) -> URLSession {
+    // and pairing-code claims avoid the same iOS proxy path that can break direct websocket pairing.
+    private func relayControlURLSession(for url: URL) -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.waitsForConnectivity = false
         configuration.allowsCellularAccess = true

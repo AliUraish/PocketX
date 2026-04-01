@@ -95,7 +95,7 @@ extension CodexService {
                 requestImmediateSync(threadId: activeThreadId)
                 // Re-check bridge-managed state when the app becomes active again.
                 Task { @MainActor [weak self] in
-                    await self?.refreshBridgeManagedState(allowAvailableBridgeUpdatePrompt: true)
+                    await self?.refreshConnectionDiagnostics(allowAvailableBridgeUpdatePrompt: true)
                 }
             } else {
                 stopSyncLoop()
@@ -146,12 +146,12 @@ extension CodexService {
         }
 
         do {
-            let activeThreads = try await fetchServerThreads(limit: recentThreadListLimit)
+            let activeThreads = try await fetchServerThreads()
 
             // Also fetch server-archived threads so they survive app restarts.
             var archivedThreads: [CodexThread] = []
             do {
-                archivedThreads = try await fetchServerThreads(limit: recentThreadListLimit, archived: true)
+                archivedThreads = try await fetchServerThreads(archived: true)
             } catch {
                 debugSyncLog("thread/list archived fetch failed (non-fatal): \(error.localizedDescription)")
             }
@@ -253,7 +253,7 @@ extension CodexService {
         refreshAllThreadTimelineStates()
 
         if activeThreadId == nil {
-            activeThreadId = firstLiveThreadID()
+            activeThreadId = preferredVisibleThreadID()
         }
 
         if pendingNotificationOpenThreadID != nil {
@@ -266,6 +266,7 @@ extension CodexService {
     }
 
     func handleMissingThread(_ threadId: String) {
+        clearRememberedLastOpenedThreadID(ifMatches: threadId)
         clearRunningState(for: threadId)
         clearOutcomeBadge(for: threadId)
 
@@ -416,6 +417,9 @@ extension CodexService {
 
     // Applies archive state consistently across parent/child subtrees without duplicating row-state cleanup.
     private func setThreadArchivedLocally(_ threadId: String, isArchived: Bool) {
+        if isArchived {
+            clearRememberedLastOpenedThreadID(ifMatches: threadId)
+        }
         clearRunningState(for: threadId)
         removeThreadTimelineState(for: threadId)
         clearOutcomeBadge(for: threadId)
@@ -463,6 +467,7 @@ extension CodexService {
 
     // Centralizes local-only thread cleanup so repo-group deletion can reuse it safely.
     private func removeThreadLocally(_ threadId: String, persistAsDeleted: Bool, persistMessages: Bool = true) {
+        clearRememberedLastOpenedThreadID(ifMatches: threadId)
         clearRunningState(for: threadId)
         removeThreadTimelineState(for: threadId)
         clearOutcomeBadge(for: threadId)
