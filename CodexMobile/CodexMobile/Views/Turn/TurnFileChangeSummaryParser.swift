@@ -215,7 +215,9 @@ enum TurnFileChangeSummaryParser {
             let hasPatchEvidence = pathsWithDiffBodyEvidence.contains(path)
                 || pathsWithNonZeroInlineTotals.contains(path)
             let hasActionWithEvidence = inferredAction != nil && hasPatchEvidence
-            guard hasNonZeroTotals || hasActionWithEvidence else {
+            let hasExplicitActionOnly = inferredAction != nil
+                && (sawInlineAction || actionsByPath[path] != nil)
+            guard hasNonZeroTotals || hasActionWithEvidence || hasExplicitActionOnly else {
                 return nil
             }
 
