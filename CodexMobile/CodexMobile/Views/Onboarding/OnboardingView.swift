@@ -31,7 +31,7 @@ struct OnboardingView: View {
                         stepNumber: 1,
                         icon: "terminal",
                         title: "Install Codex CLI",
-                        description: "The AI coding agent that lives in your terminal. Remodex connects to it from your iPhone.",
+                        description: "The AI coding agent that lives in your terminal. rimcodex connects to it from your iPhone.",
                         command: codexInstallCommand
                     )
                     .tag(2)
@@ -41,16 +41,16 @@ struct OnboardingView: View {
                         icon: "link",
                         title: "Install the Bridge",
                         description: "A lightweight relay that securely connects your Mac to your iPhone.",
-                        command: "npm install -g remodex@latest"
+                        command: "npm install -g rimcodex@latest"
                     )
                     .tag(3)
 
                     OnboardingStepPage(
                         stepNumber: 3,
-                        icon: "qrcode.viewfinder",
+                        icon: "number.square",
                         title: "Start Pairing",
-                        description: "Run this on your Mac. A QR code will appear in your terminal — scan it next.",
-                        command: "remodex up"
+                        description: "Run this on your Mac. A short pairing code will appear in your terminal. Enter that code on your iPhone next.",
+                        command: "rimcodex up"
                     )
                     .tag(4)
                 }
@@ -66,7 +66,7 @@ struct OnboardingView: View {
                 advanceToNextPage()
             }
         } message: {
-            Text("Copy and paste \"\(codexInstallCommand)\" on your Mac before moving on. Remodex will not work until Codex CLI is installed and available in your PATH.")
+            Text("Copy and paste \"\(codexInstallCommand)\" on your Mac before moving on. rimcodex will not work until Codex CLI is installed and available in your PATH.")
         }
     }
 
@@ -88,7 +88,7 @@ struct OnboardingView: View {
             Button(action: handleContinue) {
                 HStack(spacing: 10) {
                     if currentPage == pageCount - 1 {
-                        Image(systemName: "qrcode")
+                        Image(systemName: "number.square")
                             .font(.system(size: 15, weight: .semibold))
                     }
 
@@ -124,7 +124,7 @@ struct OnboardingView: View {
         switch currentPage {
         case 0: return "Get Started"
         case 1: return "Set Up"
-        case pageCount - 1: return "Scan QR Code"
+        case pageCount - 1: return "Pair with Code"
         default: return "Continue"
         }
     }
