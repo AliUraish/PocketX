@@ -151,7 +151,7 @@ struct RevenueCatPaywallView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 
 
-            Text("Unlock Remodex Pro")
+            Text("Unlock rimcodex Pro")
                 .font(AppFont.system(size: 24, weight: .bold))
 
             Text("Everything runs on your Mac. Your phone is the remote.")
@@ -216,7 +216,7 @@ struct RevenueCatPaywallView: View {
                                 .tint(colorScheme == .dark ? .black : .white)
                         } else {
                        
-                            Text("Unlock Remodex Pro")
+                            Text("Unlock rimcodex Pro")
                                 .font(AppFont.body(weight: .semibold))
                         }
                     }
@@ -251,14 +251,18 @@ struct RevenueCatPaywallView: View {
                         }
                     }
 
-                    Text(" · ").foregroundStyle(.secondary)
-                    Button("Privacy") {
-                        UIApplication.shared.open(AppEnvironment.privacyPolicyURL)
+                    if let privacyPolicyURL = AppEnvironment.privacyPolicyURL {
+                        Text(" · ").foregroundStyle(.secondary)
+                        Button("Privacy") {
+                            UIApplication.shared.open(privacyPolicyURL)
+                        }
                     }
 
-                    Text(" · ").foregroundStyle(.secondary)
-                    Button("Terms") {
-                        UIApplication.shared.open(AppEnvironment.termsOfUseURL)
+                    if let termsOfUseURL = AppEnvironment.termsOfUseURL {
+                        Text(" · ").foregroundStyle(.secondary)
+                        Button("Terms") {
+                            UIApplication.shared.open(termsOfUseURL)
+                        }
                     }
                 }
                 .font(AppFont.caption(weight: .medium))
