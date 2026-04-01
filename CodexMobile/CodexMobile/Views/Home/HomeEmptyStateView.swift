@@ -73,7 +73,7 @@ struct HomeEmptyStateView<AuthSection: View>: View {
                         .multilineTextAlignment(.center)
                 }
 
-                // Keeps reconnect or a fresh QR scan one tap away from the empty state.
+                // Keeps reconnect or a fresh pairing attempt one tap away from the empty state.
                 Button(action: onPrimaryAction) {
                     HStack(spacing: 10) {
                         if isBusy {
@@ -102,7 +102,7 @@ struct HomeEmptyStateView<AuthSection: View>: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle("Remodex")
+        .navigationTitle("rimcodex")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if connectionPhase == .connecting {
