@@ -80,7 +80,7 @@ test("loadOrCreateBridgeDeviceState throws when only the legacy Keychain mirror 
 
     assert.throws(
       () => loadOrCreateBridgeDeviceState(),
-      /saved Remodex pairing state in legacy Keychain bridge state is unreadable/i
+      /saved rimcodex pairing state in legacy Keychain bridge state is unreadable/i
     );
     assert.equal(fs.existsSync(canonicalStateFile), false);
   });
@@ -111,7 +111,7 @@ test("loadOrCreateBridgeDeviceState throws when the canonical file is corrupted 
 
     assert.throws(
       () => loadOrCreateBridgeDeviceState(),
-      /saved Remodex pairing state in device-state\.json is unreadable/i
+      /saved rimcodex pairing state in device-state\.json is unreadable/i
     );
   });
 });
@@ -169,7 +169,7 @@ function makeDeviceState(overrides = {}) {
 function withTempDeviceStateEnv(run) {
   const previousDir = process.env.REMODEX_DEVICE_STATE_DIR;
   const previousMirror = process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE;
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-device-state-"));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rimcodex-device-state-"));
   const canonicalStateFile = path.join(tempRoot, "device-state.json");
   const keychainMirrorFile = path.join(tempRoot, "keychain-device-state.json");
 
