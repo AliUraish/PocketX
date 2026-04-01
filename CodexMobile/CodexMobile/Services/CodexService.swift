@@ -27,6 +27,16 @@ struct CodexRecentActivityLine {
     let timestamp: Date
 }
 
+struct CodexBridgeDiagnosticEvent: Identifiable, Equatable, Sendable {
+    let id: String
+    let type: String
+    let level: String
+    let message: String
+    let detail: String?
+    let recordedAt: Date
+    let metadata: [String: String]
+}
+
 struct CodexRunningThreadWatch: Equatable, Sendable {
     let threadId: String
     let expiresAt: Date
@@ -349,6 +359,8 @@ final class CodexService {
     var bridgeProtocolAvailability: CodexBridgeProtocolAvailability = .unknown
     // Latest explicit bridge health snapshot, when supported by the connected Mac bridge.
     var bridgeHealthSnapshot: CodexBridgeHealthSnapshot?
+    // Recent bridge-side diagnostic journal entries for reconnect/runtime debugging.
+    var bridgeDiagnosticEvents: [CodexBridgeDiagnosticEvent] = []
     // Seeds brand-new chats with one-shot composer actions like code review.
     var pendingComposerActionByThreadID: [String: CodexPendingThreadComposerAction] = [:]
     // In-memory identity directory for subagents, keyed by thread id and agent id.
