@@ -8,7 +8,6 @@ import UIKit
 
 struct SettingsView: View {
     @Environment(CodexService.self) private var codex
-    @Environment(SubscriptionService.self) private var subscriptions
 
     @AppStorage("codex.appFontStyle") private var appFontStyleRawValue = AppFont.defaultStoredStyleRawValue
     @State private var isShowingMacNameSheet = false
@@ -24,7 +23,6 @@ struct SettingsView: View {
                 SettingsAppearanceCard(appFontStyle: appFontStyleBinding)
                 SettingsNotificationsCard()
                 SettingsGPTAccountCard()
-                SettingsSubscriptionCard()
                 SettingsBridgeVersionCard()
                 runtimeDefaultsSection
                 SettingsAboutCard()
@@ -43,12 +41,6 @@ struct SettingsView: View {
                     systemName: trustedPairPresentation.systemName ?? trustedPairPresentation.name
                 )
             }
-        }
-        .task {
-            guard subscriptions.bootstrapState == .idle else {
-                return
-            }
-            await subscriptions.bootstrap()
         }
     }
 
@@ -146,6 +138,30 @@ struct SettingsView: View {
                     Text(connectionProgressLabel)
                         .font(AppFont.caption())
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            if let healthPresentation = codex.bridgeHealthPresentation {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Health")
+                            .font(AppFont.caption(weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(healthPresentation.state.label)
+                            .font(AppFont.caption(weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text(healthPresentation.summary)
+                        .font(AppFont.caption())
+                        .foregroundStyle(.primary)
+
+                    if let detail = healthPresentation.detail, !detail.isEmpty {
+                        Text(detail)
+                            .font(AppFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -276,52 +292,6 @@ struct SettingsView: View {
             get: { SidebarMacNicknameStore.nickname(for: presentation.deviceId) },
             set: { SidebarMacNicknameStore.setNickname($0, for: presentation.deviceId) }
         )
-    }
-}
-
-private struct SettingsSubscriptionCard: View {
-    @Environment(SubscriptionService.self) private var subscriptions
-    @State private var isPresentingPaywall = false
-
-    var body: some View {
-        SettingsCard(title: "Remodex Pro") {
-            HStack {
-                Text("Status")
-                Spacer()
-                Text(subscriptions.hasProAccess ? "Active" : "Free")
-                    .foregroundStyle(subscriptions.hasProAccess ? .green : .secondary)
-            }
-
-            if subscriptions.hasProAccess {
-                Text("Your Pro access is active. You can still restore purchases or manage your subscription from Apple.")
-                    .font(AppFont.caption())
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("Open the custom paywall to choose a monthly or yearly plan.")
-                    .font(AppFont.caption())
-                    .foregroundStyle(.secondary)
-            }
-
-            SettingsButton(subscriptions.hasProAccess ? "View Pro" : "Upgrade to Pro") {
-                isPresentingPaywall = true
-            }
-
-            SettingsButton(subscriptions.isRestoring ? "Restoring..." : "Restore Purchases", isLoading: subscriptions.isRestoring) {
-                Task {
-                    await subscriptions.restorePurchases()
-                }
-            }
-            .disabled(subscriptions.isPurchasing)
-
-            if let error = subscriptions.lastErrorMessage, !error.isEmpty {
-                Text(error)
-                    .font(AppFont.caption())
-                    .foregroundStyle(.red)
-            }
-        }
-        .sheet(isPresented: $isPresentingPaywall) {
-            RevenueCatPaywallView()
-        }
     }
 }
 
@@ -766,7 +736,7 @@ private struct SettingsBridgeVersionCard: View {
         }
 
         if installedVersion.compare(latestVersion, options: .numeric) == .orderedAscending {
-            return "A newer Remodex package is available on npm."
+            return "A newer rimcodex package is available on npm."
         }
 
         return "This Mac is running a different build than the current npm latest."
@@ -887,7 +857,7 @@ private struct SettingsAboutCard: View {
                 isShowingAbout = true
             } label: {
                 settingsAccessoryRow(
-                    title: "How Remodex Works",
+                    title: "How rimcodex Works",
                     leading: {
                         Image(systemName: "info.circle")
                             .font(AppFont.subheadline(weight: .medium))
@@ -915,36 +885,40 @@ private struct SettingsAboutCard: View {
             }
             .buttonStyle(.plain)
 
-            Button {
-                HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                UIApplication.shared.open(AppEnvironment.privacyPolicyURL)
-            } label: {
-                settingsAccessoryRow(
-                    title: "Privacy Policy",
-                    leading: {
-                        Image(systemName: "hand.raised")
-                            .font(AppFont.subheadline(weight: .medium))
-                    }
-                )
+            if let privacyPolicyURL = AppEnvironment.privacyPolicyURL {
+                Button {
+                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                    UIApplication.shared.open(privacyPolicyURL)
+                } label: {
+                    settingsAccessoryRow(
+                        title: "Privacy Policy",
+                        leading: {
+                            Image(systemName: "hand.raised")
+                                .font(AppFont.subheadline(weight: .medium))
+                        }
+                    )
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
-            Button {
-                HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                UIApplication.shared.open(AppEnvironment.termsOfUseURL)
-            } label: {
-                settingsAccessoryRow(
-                    title: "Terms of Use",
-                    leading: {
-                        Image(systemName: "doc.text")
-                            .font(AppFont.subheadline(weight: .medium))
-                    }
-                )
+            if let termsOfUseURL = AppEnvironment.termsOfUseURL {
+                Button {
+                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                    UIApplication.shared.open(termsOfUseURL)
+                } label: {
+                    settingsAccessoryRow(
+                        title: "Terms of Use",
+                        leading: {
+                            Image(systemName: "doc.text")
+                                .font(AppFont.subheadline(weight: .medium))
+                        }
+                    )
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .fullScreenCover(isPresented: $isShowingAbout) {
-            AboutRemodexView()
+            AboutRimcodexView()
         }
     }
 

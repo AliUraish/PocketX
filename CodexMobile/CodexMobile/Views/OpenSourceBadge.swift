@@ -13,33 +13,40 @@ struct OpenSourceBadge: View {
         case dark
     }
 
-    private let repoURL = URL(string: "https://github.com/Emanuele-web04/remodex")!
-
     var body: some View {
-        Link(destination: repoURL) {
-            HStack(spacing: 6) {
-                Image("github-mark-white")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 14, height: 14)
-
-                Text("Open source")
-                    .font(AppFont.caption(weight: .medium))
+        Group {
+            if let repoURL = AppEnvironment.sourceRepositoryURL {
+                Link(destination: repoURL) {
+                    badgeLabel
+                }
+            } else {
+                badgeLabel
             }
-            .foregroundStyle(foregroundColor)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(backgroundFill)
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(borderColor, lineWidth: 1)
-            )
         }
-        .buttonStyle(.plain)
         .accessibilityLabel("Open source on GitHub")
+    }
+
+    private var badgeLabel: some View {
+        HStack(spacing: 6) {
+            Image("github-mark-white")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 14, height: 14)
+
+            Text("Open source")
+                .font(AppFont.caption(weight: .medium))
+        }
+        .foregroundStyle(foregroundColor)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(
+            Capsule(style: .continuous)
+                .fill(backgroundFill)
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        )
     }
 
     private var foregroundColor: Color {
