@@ -13,7 +13,10 @@ node_modules/
 # Xcode build
 DerivedData/
 build/
+.build/
+.swiftpm/
 *.ipa
+*.xcresult
 
 # Environment / secrets
 .env
@@ -43,6 +46,13 @@ $TMP_PLACEHOLDER
 
 # Claude project config (local only)
 .claude/
+.cursor/
 
 # VS Code
 .vscode/
+
+# Logs / coverage
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage/
