@@ -29,6 +29,7 @@ const {
 const { createBridgePackageVersionStatusReader } = require("./package-version-status");
 const { createPushNotificationServiceClient } = require("./push-notification-service-client");
 const { createPushNotificationTracker } = require("./push-notification-tracker");
+const { createBridgeApprovalStateStore } = require("./approval-state");
 const {
   loadOrCreateBridgeDeviceState,
   resolveBridgeRelaySession,
@@ -103,6 +104,10 @@ function startBridge({
     sessionId,
     pushServiceClient,
     previewMaxChars: config.pushPreviewMaxChars,
+  });
+  const approvalState = createBridgeApprovalStateStore({
+    bridgeSessionId: sessionId,
+    staleAfterMs: PENDING_BRIDGE_REQUEST_STALE_AFTER_MS,
   });
   const readBridgePackageVersionStatus = createBridgePackageVersionStatusReader();
 
@@ -1176,14 +1181,22 @@ function startBridge({
 
   function rememberPendingBridgeInboundRequest(requestId, method, params) {
     pruneExpiredBridgeProtocolState();
-    pendingBridgeInboundRequestsById.set(String(requestId), {
+    const trackedRequest = {
       requestId: String(requestId),
       method,
       params: safeBridgeParamsObject(params),
       threadId: extractThreadId(method, params),
       turnId: extractTurnId(method, params),
       createdAt: Date.now(),
-    });
+    };
+    pendingBridgeInboundRequestsById.set(String(requestId), trackedRequest);
+    if (isBridgeApprovalMethod(method)) {
+      approvalState.rememberPendingApproval({
+        ...trackedRequest,
+        command: readString(trackedRequest.params?.command),
+        reason: readString(trackedRequest.params?.reason),
+      });
+    }
     publishBridgeHealthSnapshotIfNeeded();
   }
 
@@ -1193,7 +1206,15 @@ function startBridge({
       return;
     }
 
-    pendingBridgeInboundRequestsById.delete(String(parsed.id));
+    const requestId = String(parsed.id);
+    const pendingRequest = pendingBridgeInboundRequestsById.get(requestId);
+    pendingBridgeInboundRequestsById.delete(requestId);
+    if (pendingRequest && isBridgeApprovalMethod(pendingRequest.method)) {
+      approvalState.resolvePendingApproval(requestId, parsed.result, {
+        outcome: parsed.error ? "response_error_forwarded" : "response_forwarded",
+      });
+      publishBridgeHealthSnapshotIfNeeded();
+    }
   }
 
   function pruneExpiredBridgeProtocolState(now = Date.now()) {
@@ -1206,6 +1227,9 @@ function startBridge({
     for (const [requestId, trackedRequest] of pendingBridgeInboundRequestsById.entries()) {
       if (!trackedRequest || (now - trackedRequest.createdAt) >= PENDING_BRIDGE_REQUEST_STALE_AFTER_MS) {
         pendingBridgeInboundRequestsById.delete(requestId);
+        if (trackedRequest && isBridgeApprovalMethod(trackedRequest.method)) {
+          approvalState.expirePendingApproval(requestId, "stale_timeout");
+        }
       }
     }
   }
@@ -1268,6 +1292,9 @@ function startBridge({
       result,
     }));
     pendingBridgeInboundRequestsById.delete(requestId);
+    approvalState.resolvePendingApproval(requestId, result, {
+      outcome: "resolved_from_phone",
+    });
     publishBridgeHealthSnapshotIfNeeded();
 
     return {
