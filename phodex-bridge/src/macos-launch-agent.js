@@ -1,8 +1,8 @@
 // FILE: macos-launch-agent.js
-// Purpose: Owns macOS-only launchd install/start/stop/status helpers for the background Remodex bridge.
+// Purpose: Owns macOS-only launchd install/start/stop/status helpers for the background rimcodex bridge.
 // Layer: CLI helper
-// Exports: start/stop/status helpers plus the launchd service runner used by `remodex up`.
-// Depends on: child_process, fs, os, path, ./bridge, ./daemon-state, ./codex-desktop-refresher, ./qr, ./secure-device-state
+// Exports: start/stop/status helpers plus the launchd service runner used by `rimcodex up`.
+// Depends on: child_process, fs, os, path, ./bridge, ./daemon-state, ./codex-desktop-refresher, ./pairing-code, ./secure-device-state
 
 const { execFileSync } = require("child_process");
 const fs = require("fs");
@@ -10,7 +10,7 @@ const os = require("os");
 const path = require("path");
 const { startBridge } = require("./bridge");
 const { readBridgeConfig } = require("./codex-desktop-refresher");
-const { printQR } = require("./qr");
+const { printPairingCode } = require("./pairing-code");
 const { resetBridgeDeviceState } = require("./secure-device-state");
 const {
   clearBridgeStatus,
@@ -28,17 +28,17 @@ const {
   writePairingSession,
 } = require("./daemon-state");
 
-const SERVICE_LABEL = "com.remodex.bridge";
+const SERVICE_LABEL = "com.rimcodex.bridge";
 const DEFAULT_PAIRING_WAIT_TIMEOUT_MS = 10_000;
 const DEFAULT_PAIRING_WAIT_INTERVAL_MS = 200;
 
-// Runs the bridge inside launchd while keeping QR rendering in the foreground CLI command.
+// Runs the bridge inside launchd while keeping pairing-code rendering in the foreground CLI command.
 function runMacOSBridgeService({ env = process.env } = {}) {
   assertDarwinPlatform();
   const config = readDaemonConfig({ env });
   if (!config?.relayUrl) {
     const message = "No relay URL configured for the macOS bridge service.";
-    // Clear any stale QR so the CLI does not keep showing a pairing payload for a dead service.
+    // Clear any stale pairing state so the CLI does not keep showing a dead pairing code.
     clearPairingSession({ env });
     writeBridgeStatus({
       state: "error",
@@ -46,15 +46,20 @@ function runMacOSBridgeService({ env = process.env } = {}) {
       pid: process.pid,
       lastError: message,
     }, { env });
-    console.error(`[remodex] ${message}`);
+    console.error(`[rimcodex] ${message}`);
     return;
   }
 
   startBridge({
     config,
+    printPairingCode: false,
     printPairingQr: false,
-    onPairingPayload(pairingPayload) {
-      writePairingSession(pairingPayload, { env });
+    onPairingSession(pairingSession) {
+      if (pairingSession?.pairingCode) {
+        writePairingSession(pairingSession, { env });
+      } else {
+        clearPairingSession({ env });
+      }
     },
     onBridgeStatus(status) {
       writeBridgeStatus(status, { env });
@@ -70,7 +75,7 @@ async function startMacOSBridgeService({
   execFileSyncImpl = execFileSync,
   osImpl = os,
   nodePath = process.execPath,
-  cliPath = path.resolve(__dirname, "..", "bin", "remodex.js"),
+  cliPath = path.resolve(__dirname, "..", "bin", "rimcodex.js"),
   waitForPairing = false,
   pairingTimeoutMs = DEFAULT_PAIRING_WAIT_TIMEOUT_MS,
   pairingPollIntervalMs = DEFAULT_PAIRING_WAIT_INTERVAL_MS,
@@ -179,25 +184,24 @@ function printMacOSBridgeServiceStatus(options = {}) {
   const bridgeState = status.bridgeStatus?.state || "unknown";
   const connectionStatus = status.bridgeStatus?.connectionStatus || "unknown";
   const pairingCreatedAt = status.pairingSession?.createdAt || "none";
-  console.log(`[remodex] Service label: ${status.label}`);
-  console.log(`[remodex] Installed: ${status.installed ? "yes" : "no"}`);
-  console.log(`[remodex] Launchd loaded: ${status.launchdLoaded ? "yes" : "no"}`);
-  console.log(`[remodex] PID: ${status.launchdPid || status.bridgeStatus?.pid || "unknown"}`);
-  console.log(`[remodex] Bridge state: ${bridgeState}`);
-  console.log(`[remodex] Connection: ${connectionStatus}`);
-  console.log(`[remodex] Pairing payload: ${pairingCreatedAt}`);
-  console.log(`[remodex] Stdout log: ${status.stdoutLogPath}`);
-  console.log(`[remodex] Stderr log: ${status.stderrLogPath}`);
+  console.log(`[rimcodex] Service label: ${status.label}`);
+  console.log(`[rimcodex] Installed: ${status.installed ? "yes" : "no"}`);
+  console.log(`[rimcodex] Launchd loaded: ${status.launchdLoaded ? "yes" : "no"}`);
+  console.log(`[rimcodex] PID: ${status.launchdPid || status.bridgeStatus?.pid || "unknown"}`);
+  console.log(`[rimcodex] Bridge state: ${bridgeState}`);
+  console.log(`[rimcodex] Connection: ${connectionStatus}`);
+  console.log(`[rimcodex] Pairing session: ${pairingCreatedAt}`);
+  console.log(`[rimcodex] Stdout log: ${status.stdoutLogPath}`);
+  console.log(`[rimcodex] Stderr log: ${status.stderrLogPath}`);
 }
 
-function printMacOSBridgePairingQr({ pairingSession = null, env = process.env, fsImpl = fs } = {}) {
+function printMacOSBridgePairingCode({ pairingSession = null, env = process.env, fsImpl = fs } = {}) {
   const nextPairingSession = pairingSession || readPairingSession({ env, fsImpl });
-  const pairingPayload = nextPairingSession?.pairingPayload;
-  if (!pairingPayload) {
-    throw new Error("The macOS bridge service did not publish a pairing payload yet.");
+  if (!nextPairingSession?.pairingCode) {
+    throw new Error("The macOS bridge service did not publish a pairing session yet.");
   }
 
-  printQR(pairingPayload);
+  printPairingCode(nextPairingSession);
 }
 
 // Persists a launch agent that always runs the Node CLI entrypoint in service mode.
@@ -206,7 +210,7 @@ function writeLaunchAgentPlist({
   fsImpl = fs,
   osImpl = os,
   nodePath = process.execPath,
-  cliPath = path.resolve(__dirname, "..", "bin", "remodex.js"),
+  cliPath = path.resolve(__dirname, "..", "bin", "rimcodex.js"),
 } = {}) {
   const plistPath = resolveLaunchAgentPlistPath({ env, osImpl });
   const stateDir = resolveRemodexStateDir({ env, osImpl });
@@ -264,7 +268,7 @@ function buildLaunchAgentPlist({
     <string>${escapeXml(homeDir)}</string>
     <key>PATH</key>
     <string>${escapeXml(pathEnv)}</string>
-    <key>REMODEX_DEVICE_STATE_DIR</key>
+    <key>RIMCODEX_DEVICE_STATE_DIR</key>
     <string>${escapeXml(stateDir)}</string>
   </dict>
   <key>StandardOutPath</key>
@@ -288,14 +292,14 @@ async function waitForFreshPairingSession({
   while (Date.now() <= deadline) {
     const pairingSession = readPairingSession({ env, fsImpl });
     const createdAt = Date.parse(pairingSession?.createdAt || "");
-    if (pairingSession?.pairingPayload && Number.isFinite(createdAt) && createdAt >= startedAt) {
+    if (pairingSession?.pairingCode && Number.isFinite(createdAt) && createdAt >= startedAt) {
       return pairingSession;
     }
     await sleep(intervalMs);
   }
 
   throw new Error(
-    `Timed out waiting for the macOS bridge service to publish a pairing QR. `
+    `Timed out waiting for the macOS bridge service to publish a pairing code. `
     + `Check ${resolveBridgeStderrLogPath({ env })}.`
   );
 }
@@ -388,7 +392,7 @@ function assertRelayConfigured(config) {
   if (typeof config?.relayUrl === "string" && config.relayUrl.trim()) {
     return;
   }
-  throw new Error("No relay URL configured. Run ./run-local-remodex.sh or set REMODEX_RELAY before enabling the macOS bridge service.");
+  throw new Error("No relay URL configured. Run ./run-local-rimcodex.sh or set RIMCODEX_RELAY before enabling the macOS bridge service.");
 }
 
 function launchAgentDomain(env) {
@@ -444,7 +448,8 @@ function sleep(ms) {
 module.exports = {
   buildLaunchAgentPlist,
   getMacOSBridgeServiceStatus,
-  printMacOSBridgePairingQr,
+  printMacOSBridgePairingCode,
+  printMacOSBridgePairingQr: printMacOSBridgePairingCode,
   printMacOSBridgeServiceStatus,
   resetMacOSBridgePairing,
   resolveLaunchAgentPlistPath,
