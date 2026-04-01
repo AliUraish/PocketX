@@ -129,7 +129,6 @@ function normalizeStoredPairingSession(value) {
     && (
       Object.prototype.hasOwnProperty.call(value.pairingPayload, "pairingCode")
       || Object.prototype.hasOwnProperty.call(value.pairingPayload, "pairingSessionId")
-      || Object.prototype.hasOwnProperty.call(value.pairingPayload, "expiresAt")
       || Object.prototype.hasOwnProperty.call(value.pairingPayload, "pairingPayload")
     )
     ? value.pairingPayload
