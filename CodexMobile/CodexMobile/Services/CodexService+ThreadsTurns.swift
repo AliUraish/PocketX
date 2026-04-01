@@ -394,28 +394,56 @@ extension CodexService {
     }
 
     // Accepts the latest pending approval request.
-    func approvePendingRequest(forSession: Bool = false) async throws {
-        guard let request = pendingApproval else {
+    func approvePendingRequest(_ request: CodexApprovalRequest? = nil, forSession: Bool = false) async throws {
+        let resolvedRequest = request ?? pendingApproval
+        guard let resolvedRequest else {
             throw CodexServiceError.noPendingApproval
         }
 
-        let normalizedMethod = request.method.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedMethod = resolvedRequest.method.trimmingCharacters(in: .whitespacesAndNewlines)
         let isCommandApproval = normalizedMethod == "item/commandExecution/requestApproval"
             || normalizedMethod == "item/command_execution/request_approval"
         let decision = (forSession && isCommandApproval) ? "acceptForSession" : "accept"
 
-        try await sendResponse(id: request.requestID, result: approvalDecisionResult(decision))
-        pendingApproval = nil
+        if isBridgeProtocolAvailable {
+            guard let bridgeRequestId = bridgeApprovalRequestIdentifier(for: resolvedRequest) else {
+                throw CodexServiceError.invalidInput("Approval request is missing a bridge request identifier")
+            }
+            _ = try await sendRequest(
+                method: "bridge/approval/resolve",
+                params: .object([
+                    "requestId": .string(bridgeRequestId),
+                    "decision": .string(decision),
+                ])
+            )
+        } else {
+            try await sendResponse(id: resolvedRequest.requestID, result: approvalDecisionResult(decision))
+        }
+        removePendingApproval(idKey: resolvedRequest.id)
     }
 
     // Declines the latest pending approval request.
-    func declinePendingRequest() async throws {
-        guard let request = pendingApproval else {
+    func declinePendingRequest(_ request: CodexApprovalRequest? = nil) async throws {
+        let resolvedRequest = request ?? pendingApproval
+        guard let resolvedRequest else {
             throw CodexServiceError.noPendingApproval
         }
 
-        try await sendResponse(id: request.requestID, result: approvalDecisionResult("decline"))
-        pendingApproval = nil
+        if isBridgeProtocolAvailable {
+            guard let bridgeRequestId = bridgeApprovalRequestIdentifier(for: resolvedRequest) else {
+                throw CodexServiceError.invalidInput("Approval request is missing a bridge request identifier")
+            }
+            _ = try await sendRequest(
+                method: "bridge/approval/resolve",
+                params: .object([
+                    "requestId": .string(bridgeRequestId),
+                    "decision": .string("decline"),
+                ])
+            )
+        } else {
+            try await sendResponse(id: resolvedRequest.requestID, result: approvalDecisionResult("decline"))
+        }
+        removePendingApproval(idKey: resolvedRequest.id)
     }
 
     // Responds to item/tool/requestUserInput using the exact app-server answer envelope.
@@ -427,6 +455,18 @@ extension CodexService {
             id: requestID,
             result: buildStructuredUserInputResponse(answersByQuestionID: answersByQuestionID)
         )
+    }
+
+    private func bridgeApprovalRequestIdentifier(for request: CodexApprovalRequest) -> String? {
+        if case .string(let requestId) = request.requestID,
+           !requestId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return requestId.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        guard request.id.hasPrefix("s:") else {
+            return nil
+        }
+        return String(request.id.dropFirst(2))
     }
 
     func buildStructuredUserInputResponse(
