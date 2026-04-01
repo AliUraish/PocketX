@@ -114,6 +114,21 @@ extension CodexService {
                         createdAt: timestamp
                     )
 
+                case "functioncalloutput", "customtoolcalloutput":
+                    guard let decodedLegacyToolOutput = decodeLegacyHistoryToolOutputItem(from: itemObject) else {
+                        continue
+                    }
+                    appendHistoryMessage(
+                        to: &result,
+                        role: .system,
+                        kind: decodedLegacyToolOutput.kind,
+                        text: decodedLegacyToolOutput.text,
+                        threadId: threadId,
+                        turnId: turnID,
+                        itemId: itemID,
+                        createdAt: timestamp
+                    )
+
                 case "diff":
                     guard let decodedFileChangeText = decodeHistoryDiffItemText(from: itemObject) else { continue }
                     appendHistoryMessage(
@@ -442,7 +457,10 @@ extension CodexService {
                    candidate.role == .user
                        && candidate.deliveryState != .failed
                        && normalizedMessageText(candidate.text) == normalizedMessageText(message.text)
-                       && attachmentSignature(for: candidate.attachments) == attachmentSignature(for: message.attachments)
+                       && userMessageAttachmentsLikelyMatch(
+                           candidate.attachments,
+                           message.attachments
+                       )
                        && (candidate.turnId == nil || candidate.turnId == turnId)
                }) {
                 merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
@@ -570,7 +588,10 @@ extension CodexService {
                    candidate.role == .user
                        && candidate.deliveryState == .pending
                        && normalizedMessageText(candidate.text) == normalizedMessageText(message.text)
-                       && attachmentSignature(for: candidate.attachments) == attachmentSignature(for: message.attachments)
+                       && userMessageAttachmentsLikelyMatch(
+                           candidate.attachments,
+                           message.attachments
+                       )
                }) {
                 merged[pendingIndex] = reconcileExistingMessage(merged[pendingIndex], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
                 continue
@@ -831,6 +852,43 @@ extension CodexService {
                 attachment.payloadDataURL ?? attachment.sourceURL ?? attachment.thumbnailBase64JPEG
             }
             .joined(separator: "|")
+    }
+
+    nonisolated static func userMessageAttachmentsLikelyMatch(
+        _ lhs: [CodexImageAttachment],
+        _ rhs: [CodexImageAttachment]
+    ) -> Bool {
+        if attachmentSignature(for: lhs) == attachmentSignature(for: rhs) {
+            return true
+        }
+
+        guard !lhs.isEmpty,
+              !rhs.isEmpty,
+              lhs.count == rhs.count else {
+            return false
+        }
+
+        let lhsAllElided = lhs.allSatisfy(isElidedHistoryImageAttachment)
+        let rhsAllElided = rhs.allSatisfy(isElidedHistoryImageAttachment)
+        guard lhsAllElided != rhsAllElided else {
+            return false
+        }
+
+        let concreteAttachments = lhsAllElided ? rhs : lhs
+        return concreteAttachments.allSatisfy { attachment in
+            !isElidedHistoryImageAttachment(attachment)
+                && (
+                    (attachment.payloadDataURL?.isEmpty == false)
+                        || (attachment.sourceURL?.isEmpty == false)
+                        || !attachment.thumbnailBase64JPEG.isEmpty
+                )
+        }
+    }
+
+    nonisolated static func isElidedHistoryImageAttachment(_ attachment: CodexImageAttachment) -> Bool {
+        attachment.payloadDataURL == nil
+            && attachment.thumbnailBase64JPEG.isEmpty
+            && attachment.sourceURL == "rimcodex://history-image-elided"
     }
 
     func normalizedItemType(_ rawType: String) -> String {
@@ -1569,6 +1627,258 @@ extension CodexService {
 
     func decodeHistoryDiffItemText(from itemObject: [String: JSONValue]) -> String? {
         decodeHistoryToolCallFileChangeText(from: itemObject)
+    }
+
+    func decodeLegacyHistoryToolOutputItem(from itemObject: [String: JSONValue]) -> (kind: CodexMessageKind, text: String)? {
+        guard let outputText = decodeLegacyHistoryToolOutputText(from: itemObject),
+              let fileChangeText = decodeLegacyHistoryToolOutputFileChangeText(from: outputText) else {
+            return nil
+        }
+
+        return (.fileChange, fileChangeText)
+    }
+
+    func decodeLegacyHistoryToolOutputText(from itemObject: [String: JSONValue]) -> String? {
+        let preferredKeys = [
+            "output",
+            "text",
+            "message",
+            "summary",
+            "stdout",
+            "stderr",
+            "output_text",
+            "outputText",
+        ]
+
+        for key in preferredKeys {
+            guard let rawValue = itemObject[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !rawValue.isEmpty else {
+                continue
+            }
+
+            if let nestedText = decodeLegacyHistoryNestedOutputText(from: rawValue) {
+                return nestedText
+            }
+
+            return rawValue
+        }
+
+        return nil
+    }
+
+    func decodeLegacyHistoryNestedOutputText(from rawValue: String) -> String? {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let firstCharacter = trimmed.first,
+              firstCharacter == "{" || firstCharacter == "[" else {
+            return nil
+        }
+        guard let data = trimmed.data(using: .utf8),
+              let jsonObject = try? JSONSerialization.jsonObject(with: data),
+              let object = jsonObject as? [String: Any] else {
+            return nil
+        }
+
+        let keys = ["output", "text", "message", "summary"]
+        for key in keys {
+            guard let value = object[key] as? String else { continue }
+            let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !normalized.isEmpty {
+                return normalized
+            }
+        }
+
+        return nil
+    }
+
+    func decodeLegacyHistoryToolOutputFileChangeText(from outputText: String) -> String? {
+        if let updatedFilesText = decodeLegacyUpdatedFilesText(from: outputText) {
+            return updatedFilesText
+        }
+
+        if let diffStatText = decodeLegacyDiffStatText(from: outputText) {
+            return diffStatText
+        }
+
+        return nil
+    }
+
+    func decodeLegacyUpdatedFilesText(from outputText: String) -> String? {
+        let lines = outputText
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        guard let headerIndex = lines.firstIndex(where: { line in
+            let normalized = line.lowercased()
+            return normalized.hasPrefix("success. updated the following files:")
+                || normalized.hasPrefix("updated the following files:")
+        }) else {
+            return nil
+        }
+
+        let trailingLines = lines.dropFirst(headerIndex + 1)
+        let entries = trailingLines.compactMap { line -> String? in
+            guard !line.isEmpty else { return nil }
+            return decodeLegacyUpdatedFileEntry(from: line)
+        }
+
+        guard !entries.isEmpty else { return nil }
+        return entries.joined(separator: "\n")
+    }
+
+    func decodeLegacyUpdatedFileEntry(from line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let components = trimmed.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+        if components.count == 2 {
+            let rawStatus = String(components[0]).uppercased()
+            let path = String(components[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !path.isEmpty else { return nil }
+
+            let action: String?
+            switch rawStatus.first {
+            case "A":
+                action = "Added"
+            case "D":
+                action = "Deleted"
+            case "R":
+                action = "Renamed"
+            case "M", "U":
+                action = "Updated"
+            default:
+                action = nil
+            }
+
+            if let action {
+                return "\(action) \(path)"
+            }
+        }
+
+        if decodeLegacyHistoryLooksLikePath(trimmed) {
+            return "Updated \(trimmed)"
+        }
+
+        return nil
+    }
+
+    func decodeLegacyDiffStatText(from outputText: String) -> String? {
+        let rawLines = outputText.components(separatedBy: .newlines)
+        let entryLines = rawLines.compactMap(decodeLegacyDiffStatEntry)
+        guard !entryLines.isEmpty else { return nil }
+
+        let fallbackTotals = entryLines.count == 1
+            ? decodeLegacyDiffStatSummaryTotals(from: outputText)
+            : nil
+
+        let rendered = entryLines.map { entry -> String in
+            let totals = (entry.additions > 0 || entry.deletions > 0)
+                ? (entry.additions, entry.deletions)
+                : fallbackTotals
+
+            var lines = [
+                "Path: \(entry.path)",
+                "Kind: update",
+            ]
+
+            if let totals {
+                lines.append("Totals: +\(totals.0) -\(totals.1)")
+            }
+
+            return lines.joined(separator: "\n")
+        }
+
+        return rendered.joined(separator: "\n\n")
+    }
+
+    func decodeLegacyDiffStatEntry(from rawLine: String) -> (path: String, additions: Int, deletions: Int)? {
+        let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !line.isEmpty,
+              !line.lowercased().contains("file changed"),
+              line.contains("|") else {
+            return nil
+        }
+
+        let components = line.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+        guard components.count == 2 else { return nil }
+
+        let rawPath = String(components[0]).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard decodeLegacyHistoryLooksLikePath(rawPath) else {
+            return nil
+        }
+
+        let statsSegment = String(components[1])
+        let additions = statsSegment.filter { $0 == "+" }.count
+        let deletions = statsSegment.filter { $0 == "-" }.count
+
+        return (path: rawPath, additions: additions, deletions: deletions)
+    }
+
+    func decodeLegacyDiffStatSummaryTotals(from outputText: String) -> (Int, Int)? {
+        guard let insertions = decodeLegacyDiffStatCount(
+            in: outputText,
+            pattern: #"(\d+)\s+insertions?\(\+\)"#
+        ) ?? decodeLegacyDiffStatCount(
+            in: outputText,
+            pattern: #"(\d+)\s+additions?\(\+\)"#
+        ) ?? decodeLegacyDiffStatCount(
+            in: outputText,
+            pattern: #"(\d+)\s+added"#
+        ) else {
+            if let deletions = decodeLegacyDiffStatCount(
+                in: outputText,
+                pattern: #"(\d+)\s+deletions?\(-\)"#
+            ) ?? decodeLegacyDiffStatCount(
+                in: outputText,
+                pattern: #"(\d+)\s+removed"#
+            ), deletions > 0 {
+                return (0, deletions)
+            }
+            return nil
+        }
+
+        let deletions = decodeLegacyDiffStatCount(
+            in: outputText,
+            pattern: #"(\d+)\s+deletions?\(-\)"#
+        ) ?? decodeLegacyDiffStatCount(
+            in: outputText,
+            pattern: #"(\d+)\s+removed"#
+        ) ?? 0
+
+        return (insertions, deletions)
+    }
+
+    func decodeLegacyDiffStatCount(in text: String, pattern: String) -> Int? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+            return nil
+        }
+
+        let range = NSRange(text.startIndex..., in: text)
+        guard let match = regex.firstMatch(in: text, options: [], range: range),
+              match.numberOfRanges >= 2,
+              let captureRange = Range(match.range(at: 1), in: text) else {
+            return nil
+        }
+
+        return Int(String(text[captureRange]))
+    }
+
+    func decodeLegacyHistoryLooksLikePath(_ candidate: String) -> Bool {
+        let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+
+        if trimmed.contains("/") || trimmed.hasPrefix("./") || trimmed.hasPrefix("../") {
+            return true
+        }
+
+        guard let regex = try? NSRegularExpression(
+            pattern: #"[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+"#,
+            options: []
+        ) else {
+            return false
+        }
+
+        let range = NSRange(trimmed.startIndex..., in: trimmed)
+        return regex.firstMatch(in: trimmed, options: [], range: range) != nil
     }
 
     func decodeHistoryToolCallFileChangeText(from itemObject: [String: JSONValue]) -> String? {
