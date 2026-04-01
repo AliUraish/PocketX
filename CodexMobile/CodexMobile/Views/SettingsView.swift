@@ -170,6 +170,11 @@ struct SettingsView: View {
                 pendingApprovalsSection
             }
 
+            if !codex.bridgeDiagnosticEvents.isEmpty {
+                Divider()
+                diagnosticsSection
+            }
+
             if case .retrying(_, let message) = codex.connectionRecoveryState,
                !message.isEmpty {
                 Text(message)
@@ -291,6 +296,74 @@ struct SettingsView: View {
         }
 
         return "Codex is requesting permission to continue."
+    }
+
+    @ViewBuilder private var diagnosticsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Recent diagnostics")
+                    .font(AppFont.caption(weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("\(min(codex.bridgeDiagnosticEvents.count, 6)) shown")
+                    .font(AppFont.caption())
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(Array(codex.bridgeDiagnosticEvents.prefix(6))) { event in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(diagnosticLevelLabel(for: event))
+                            .font(AppFont.caption(weight: .semibold))
+                            .foregroundStyle(diagnosticLevelColor(for: event))
+                        Spacer()
+                        Text(diagnosticTimestampLabel(for: event.recordedAt))
+                            .font(AppFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text(event.message)
+                        .font(AppFont.caption())
+                        .foregroundStyle(.primary)
+
+                    if let detail = event.detail, !detail.isEmpty {
+                        Text(detail)
+                            .font(AppFont.caption())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if event.id != codex.bridgeDiagnosticEvents.prefix(6).last?.id {
+                    Divider()
+                }
+            }
+        }
+    }
+
+    private func diagnosticLevelLabel(for event: CodexBridgeDiagnosticEvent) -> String {
+        switch event.level.lowercased() {
+        case "error":
+            return "Error"
+        case "warning":
+            return "Warning"
+        default:
+            return "Info"
+        }
+    }
+
+    private func diagnosticLevelColor(for event: CodexBridgeDiagnosticEvent) -> Color {
+        switch event.level.lowercased() {
+        case "error":
+            return .red
+        case "warning":
+            return .orange
+        default:
+            return .secondary
+        }
+    }
+
+    private func diagnosticTimestampLabel(for date: Date) -> String {
+        date.formatted(date: .omitted, time: .shortened)
     }
 
     // MARK: - Actions
