@@ -11,6 +11,14 @@ import UserNotifications
 private enum CodexNotificationSource {
     static let runCompletion = "codex.runCompletion"
     static let structuredUserInput = "codex.structuredUserInput"
+    static let bridgeEvent = "codex.bridgeEvent"
+}
+
+private enum CodexBridgeNotificationEventType: String {
+    case approvalNeeded = "approval_needed"
+    case bridgeOffline = "bridge_offline"
+    case reconnectSucceeded = "reconnect_succeeded"
+    case reconnectFailed = "reconnect_failed"
 }
 
 protocol CodexRemoteNotificationRegistering: AnyObject {
@@ -84,7 +92,8 @@ private struct CodexThreadNotificationPayload {
     init?(from userInfo: [AnyHashable: Any]) {
         guard let source = userInfo[CodexNotificationPayloadKeys.source] as? String,
               (source == CodexNotificationSource.runCompletion
-                || source == CodexNotificationSource.structuredUserInput),
+                || source == CodexNotificationSource.structuredUserInput
+                || source == CodexNotificationSource.bridgeEvent),
               let threadId = userInfo[CodexNotificationPayloadKeys.threadId] as? String,
               !threadId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return nil
@@ -250,6 +259,83 @@ extension CodexService {
                 turnId: turnId,
                 requestID: requestID,
                 questions: questions
+            )
+        }
+    }
+
+    func notifyApprovalRequestIfNeeded(
+        threadId: String,
+        turnId: String?,
+        requestID: JSONValue,
+        reason: String?
+    ) {
+        guard !isAppInForeground else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            await self?.scheduleApprovalNotificationIfNeeded(
+                threadId: threadId,
+                turnId: turnId,
+                requestID: requestID,
+                reason: reason
+            )
+        }
+    }
+
+    func notifyBridgeHealthTransitionIfNeeded(
+        from previousState: CodexBridgeHealthState,
+        to nextState: CodexBridgeHealthState
+    ) {
+        guard previousState != nextState, !isAppInForeground else {
+            return
+        }
+
+        let eventTypeAndBody: (CodexBridgeNotificationEventType, String, String)?
+        switch (previousState, nextState) {
+        case (_, .healthy) where previousState != .healthy && previousState != .unknown:
+            eventTypeAndBody = (
+                .reconnectSucceeded,
+                "rimcodex reconnected",
+                "Your Mac bridge is reachable again."
+            )
+        case (.healthy, .relayUnreachable),
+             (.healthy, .macOffline),
+             (.healthy, .bridgeDown),
+             (.healthy, .codexUnreachable),
+             (.healthy, .macSleepingOrUnresponsive):
+            eventTypeAndBody = (
+                .bridgeOffline,
+                "rimcodex went offline",
+                bridgeHealthPresentation?.detail ?? bridgeHealthPresentation?.summary ?? "The Mac bridge is no longer reachable."
+            )
+        case (.reconnecting, .relayUnreachable),
+             (.reconnecting, .macOffline),
+             (.reconnecting, .bridgeDown),
+             (.reconnecting, .codexUnreachable),
+             (.reconnecting, .macSleepingOrUnresponsive),
+             (.reconnecting, .versionMismatch):
+            eventTypeAndBody = (
+                .reconnectFailed,
+                "rimcodex reconnect failed",
+                bridgeHealthPresentation?.detail ?? bridgeHealthPresentation?.summary ?? "The Mac bridge could not be restored."
+            )
+        default:
+            eventTypeAndBody = nil
+        }
+
+        guard let (eventType, title, body) = eventTypeAndBody else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            await self?.scheduleBridgeEventNotificationIfNeeded(
+                eventType: eventType,
+                title: title,
+                body: body,
+                threadId: nil,
+                turnId: nil,
+                bridgeHealthState: nextState
             )
         }
     }
@@ -522,6 +608,107 @@ private extension CodexService {
         }
     }
 
+    func scheduleApprovalNotificationIfNeeded(
+        threadId: String,
+        turnId: String?,
+        requestID: JSONValue,
+        reason: String?
+    ) async {
+        await refreshNotificationAuthorizationStatus()
+        guard canScheduleRunCompletionNotifications else {
+            return
+        }
+
+        let now = Date()
+        pruneApprovalNotificationDedupe(now: now)
+        let dedupeKey = approvalNotificationDedupeKey(threadId: threadId, requestID: requestID)
+
+        if let previousTimestamp = approvalNotificationDedupedAt[dedupeKey],
+           now.timeIntervalSince(previousTimestamp) <= 60 {
+            return
+        }
+
+        approvalNotificationDedupedAt[dedupeKey] = now
+        let title = thread(for: threadId)?.displayTitle ?? CodexThread.defaultDisplayTitle
+        let normalizedReason = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = normalizedReason?.isEmpty == false
+            ? (normalizedReason ?? "Approval needed to continue the run.")
+            : "Approval needed to continue the run."
+
+        await scheduleBridgeEventNotificationIfNeeded(
+            eventType: .approvalNeeded,
+            title: title,
+            body: body,
+            threadId: threadId,
+            turnId: turnId,
+            requestID: requestID,
+            bridgeHealthState: nil
+        )
+    }
+
+    func scheduleBridgeEventNotificationIfNeeded(
+        eventType: CodexBridgeNotificationEventType,
+        title: String,
+        body: String,
+        threadId: String?,
+        turnId: String?,
+        requestID: JSONValue? = nil,
+        bridgeHealthState: CodexBridgeHealthState?
+    ) async {
+        await refreshNotificationAuthorizationStatus()
+        guard canScheduleRunCompletionNotifications else {
+            return
+        }
+
+        let now = Date()
+        pruneBridgeEventNotificationDedupe(now: now)
+        let dedupeKey = bridgeEventNotificationDedupeKey(
+            eventType: eventType,
+            threadId: threadId,
+            bridgeHealthState: bridgeHealthState,
+            now: now
+        )
+
+        if let previousTimestamp = bridgeEventNotificationDedupedAt[dedupeKey],
+           now.timeIntervalSince(previousTimestamp) <= 60 {
+            return
+        }
+
+        bridgeEventNotificationDedupedAt[dedupeKey] = now
+
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        content.threadIdentifier = threadId ?? "rimcodex.bridge"
+
+        var userInfo: [String: Any] = [
+            CodexNotificationPayloadKeys.source: CodexNotificationSource.bridgeEvent,
+            CodexNotificationPayloadKeys.eventType: eventType.rawValue,
+            CodexNotificationPayloadKeys.threadId: threadId ?? "",
+            CodexNotificationPayloadKeys.turnId: turnId ?? "",
+        ]
+        if let requestID {
+            userInfo[CodexNotificationPayloadKeys.requestId] = idKey(from: requestID)
+        }
+        if let bridgeHealthState {
+            userInfo[CodexNotificationPayloadKeys.bridgeHealthState] = bridgeHealthState.rawValue
+        }
+        content.userInfo = userInfo
+
+        let request = UNNotificationRequest(
+            identifier: bridgeEventNotificationIdentifier(for: dedupeKey),
+            content: content,
+            trigger: nil
+        )
+
+        do {
+            try await userNotificationCenter.add(request)
+        } catch {
+            debugRuntimeLog("failed to schedule bridge event notification: \(error.localizedDescription)")
+        }
+    }
+
     var canScheduleRunCompletionNotifications: Bool {
         switch notificationAuthorizationStatus {
         case .authorized, .provisional, .ephemeral:
@@ -586,6 +773,45 @@ private extension CodexService {
 
     func pruneStructuredUserInputNotificationDedupe(now: Date) {
         structuredUserInputNotificationDedupedAt = structuredUserInputNotificationDedupedAt.filter { _, timestamp in
+            now.timeIntervalSince(timestamp) <= 60
+        }
+    }
+
+    func approvalNotificationDedupeKey(
+        threadId: String,
+        requestID: JSONValue
+    ) -> String {
+        "\(threadId)|\(idKey(from: requestID))"
+    }
+
+    func pruneApprovalNotificationDedupe(now: Date) {
+        approvalNotificationDedupedAt = approvalNotificationDedupedAt.filter { _, timestamp in
+            now.timeIntervalSince(timestamp) <= 60
+        }
+    }
+
+    func bridgeEventNotificationDedupeKey(
+        eventType: CodexBridgeNotificationEventType,
+        threadId: String?,
+        bridgeHealthState: CodexBridgeHealthState?,
+        now: Date
+    ) -> String {
+        let timeBucket = Int(now.timeIntervalSince1970 / 30)
+        let normalizedThreadId = threadId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let state = bridgeHealthState?.rawValue ?? ""
+        return "\(eventType.rawValue)|\(normalizedThreadId)|\(state)|\(timeBucket)"
+    }
+
+    func bridgeEventNotificationIdentifier(for dedupeKey: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_."))
+        let sanitized = String(dedupeKey.unicodeScalars.map { scalar in
+            allowed.contains(scalar) ? Character(scalar) : "_"
+        })
+        return "codex.bridgeEvent.\(sanitized)"
+    }
+
+    func pruneBridgeEventNotificationDedupe(now: Date) {
+        bridgeEventNotificationDedupedAt = bridgeEventNotificationDedupedAt.filter { _, timestamp in
             now.timeIntervalSince(timestamp) <= 60
         }
     }
