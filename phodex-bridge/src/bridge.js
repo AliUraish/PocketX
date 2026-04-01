@@ -245,6 +245,15 @@ function startBridge({
       message: "Local codex app-server is unavailable.",
       detail: error.message,
     });
+    void notifyBridgePushEvent({
+      eventType: "reconnect_failed",
+      title: "rimcodex reconnect failed",
+      body: "Codex on your Mac is unavailable.",
+      dedupeKey: `reconnect-failed:codex:${Math.floor(Date.now() / 30_000)}`,
+      eventPayload: {
+        reason: "codex_unavailable",
+      },
+    });
   });
 
   codex.onSupervisorEvent?.((event) => {
@@ -420,6 +429,29 @@ function startBridge({
         connectionStatus: status,
       },
     });
+    if (status === "connected" && previousStatus && previousStatus !== "connected") {
+      void notifyBridgePushEvent({
+        eventType: "reconnect_succeeded",
+        title: "rimcodex reconnected",
+        body: "Your Mac bridge is reachable again.",
+        dedupeKey: `reconnect-succeeded:${Math.floor(Date.now() / 30_000)}`,
+        eventPayload: {
+          connectionStatus: status,
+          previousStatus,
+        },
+      });
+    } else if (status === "disconnected" && previousStatus === "connected") {
+      void notifyBridgePushEvent({
+        eventType: "bridge_offline",
+        title: "rimcodex went offline",
+        body: "The Mac bridge lost its relay connection.",
+        dedupeKey: `bridge-offline:${Math.floor(Date.now() / 30_000)}`,
+        eventPayload: {
+          connectionStatus: status,
+          previousStatus,
+        },
+      });
+    }
     console.log(`[rimcodex] ${status}`);
   }
 
@@ -1312,6 +1344,40 @@ function startBridge({
     publishBridgeHealthSnapshotIfNeeded();
   }
 
+  async function notifyBridgePushEvent({
+    eventType,
+    threadId = null,
+    turnId = null,
+    title = "",
+    body = "",
+    dedupeKey = "",
+    eventPayload = null,
+  } = {}) {
+    if (!pushServiceClient?.hasConfiguredBaseUrl) {
+      return;
+    }
+
+    const normalizedEventType = normalizeNonEmptyString(eventType);
+    const normalizedDedupeKey = normalizeNonEmptyString(dedupeKey);
+    if (!normalizedEventType || !normalizedDedupeKey) {
+      return;
+    }
+
+    try {
+      await pushServiceClient.notifyEvent({
+        eventType: normalizedEventType,
+        threadId: normalizeNonEmptyString(threadId) || undefined,
+        turnId: normalizeNonEmptyString(turnId) || undefined,
+        title: normalizeNonEmptyString(title) || undefined,
+        body: normalizeNonEmptyString(body) || undefined,
+        dedupeKey: `${sessionId}:${normalizedDedupeKey}`,
+        eventPayload: eventPayload && typeof eventPayload === "object" ? eventPayload : undefined,
+      });
+    } catch (error) {
+      console.error(`[rimcodex] push event notify failed: ${error.message}`);
+    }
+  }
+
   function resolveBridgeRuntimeState(explicitState = "") {
     const normalizedExplicitState = readString(explicitState);
     if (normalizedExplicitState) {
@@ -1462,6 +1528,17 @@ function startBridge({
         metadata: {
           threadId: trackedRequest.threadId || null,
           turnId: trackedRequest.turnId || null,
+        },
+      });
+      void notifyBridgePushEvent({
+        eventType: "approval_needed",
+        threadId: trackedRequest.threadId || null,
+        turnId: trackedRequest.turnId || null,
+        title: "rimcodex approval needed",
+        body: readString(trackedRequest.params?.reason) || "Approval needed to continue the run.",
+        dedupeKey: `approval-needed:${requestId}`,
+        eventPayload: {
+          requestId: trackedRequest.requestId,
         },
       });
     }
