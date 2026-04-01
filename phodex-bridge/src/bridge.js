@@ -2,7 +2,7 @@
 // Purpose: Runs Codex locally, bridges relay traffic, and coordinates desktop refreshes for Codex.app.
 // Layer: CLI service
 // Exports: startBridge
-// Depends on: ws, crypto, os, ./qr, ./codex-desktop-refresher, ./codex-transport, ./rollout-watch, ./voice-handler
+// Depends on: ws, crypto, os, ./pairing-code, ./codex-desktop-refresher, ./codex-transport, ./rollout-watch, ./voice-handler
 
 const WebSocket = require("ws");
 const { randomBytes } = require("crypto");
@@ -15,7 +15,7 @@ const {
 } = require("./codex-desktop-refresher");
 const { createCodexTransport } = require("./codex-transport");
 const { createThreadRolloutActivityWatcher } = require("./rollout-watch");
-const { printQR } = require("./qr");
+const { printPairingCode } = require("./pairing-code");
 const { rememberActiveThread } = require("./session-state");
 const { handleDesktopRequest } = require("./desktop-handler");
 const { handleGitRequest } = require("./git-handler");
@@ -35,25 +35,40 @@ const {
 } = require("./secure-device-state");
 const { createBridgeSecureTransport } = require("./secure-transport");
 const { createRolloutLiveMirrorController } = require("./rollout-live-mirror");
+const {
+  buildBridgeCapabilities,
+  buildBridgeEventEnvelope,
+  buildBridgeHealthSnapshot,
+  buildBridgeRequestEnvelope,
+  extractRequestedBridgeProtocolVersion,
+  isBridgeProtocolMethod,
+  isBridgeProtocolProxyMethod,
+  mapBridgeProtocolMethodToCodexMethod,
+  normalizeBridgeEventName,
+  normalizeBridgeProtocolResult,
+} = require("./bridge-protocol");
 
 const execFileAsync = promisify(execFile);
 const RELAY_WATCHDOG_PING_INTERVAL_MS = 10_000;
 const RELAY_WATCHDOG_STALE_AFTER_MS = 25_000;
 const BRIDGE_STATUS_HEARTBEAT_INTERVAL_MS = 5_000;
+const PENDING_BRIDGE_REQUEST_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 const STALE_RELAY_STATUS_MESSAGE = "Relay heartbeat stalled; reconnect pending.";
-const RELAY_HISTORY_IMAGE_REFERENCE_URL = "remodex://history-image-elided";
+const RELAY_HISTORY_IMAGE_REFERENCE_URL = "rimcodex://history-image-elided";
 
 function startBridge({
   config: explicitConfig = null,
+  printPairingCode: shouldPrintPairingCode = true,
   printPairingQr = true,
+  onPairingSession = null,
   onPairingPayload = null,
   onBridgeStatus = null,
 } = {}) {
   const config = explicitConfig || readBridgeConfig();
   const relayBaseUrl = config.relayUrl.replace(/\/+$/, "");
   if (!relayBaseUrl) {
-    console.error("[remodex] No relay URL configured.");
-    console.error("[remodex] In a source checkout, run ./run-local-remodex.sh or set REMODEX_RELAY.");
+    console.error("[rimcodex] No relay URL configured.");
+    console.error("[rimcodex] In a source checkout, run ./run-local-rimcodex.sh or set RIMCODEX_RELAY.");
     process.exit(1);
   }
 
@@ -61,7 +76,7 @@ function startBridge({
   try {
     deviceState = loadOrCreateBridgeDeviceState();
   } catch (error) {
-    console.error(`[remodex] ${(error && error.message) || "Failed to load the saved bridge pairing state."}`);
+    console.error(`[rimcodex] ${(error && error.message) || "Failed to load the saved bridge pairing state."}`);
     process.exit(1);
   }
   const relaySession = resolveBridgeRelaySession(deviceState);
@@ -100,12 +115,16 @@ function startBridge({
   let statusHeartbeatTimer = null;
   let lastRelayActivityAt = 0;
   let lastPublishedBridgeStatus = null;
+  let lastPublishedBridgeHealthSnapshotJSON = "";
   let lastConnectionStatus = null;
   let codexHandshakeState = config.codexEndpoint ? "warm" : "cold";
+  let requestedBridgeProtocolVersion = 0;
   const forwardedInitializeRequestIds = new Set();
   const bridgeManagedCodexRequestWaiters = new Map();
   const forwardedRequestMethodsById = new Map();
   const relaySanitizedResponseMethodsById = new Map();
+  const bridgeProtocolForwardedRequestsById = new Map();
+  const pendingBridgeInboundRequestsById = new Map();
   const trackedForwardedRequestMethods = new Set([
     "account/login/start",
     "account/login/cancel",
@@ -128,9 +147,11 @@ function startBridge({
     deviceState,
     onTrustedPhoneUpdate(nextDeviceState) {
       deviceState = nextDeviceState;
+      onPairingSession?.(secureTransport.readPairingSession());
       sendRelayRegistrationUpdate(nextDeviceState);
     },
   });
+  const pairingSession = secureTransport.createPairingSession();
   // Keeps one stable sender identity across reconnects so buffered replay state
   // reflects what actually made it onto the current relay socket.
   function sendRelayWireMessage(wireMessage) {
@@ -154,11 +175,11 @@ function startBridge({
   const codex = createCodexTransport({
     endpoint: config.codexEndpoint,
     env: process.env,
-    logPrefix: "[remodex]",
+    logPrefix: "[rimcodex]",
   });
   const voiceHandler = createVoiceHandler({
     sendCodexRequest,
-    logPrefix: "[remodex]",
+    logPrefix: "[rimcodex]",
   });
   startBridgeStatusHeartbeat();
   publishBridgeStatus({
@@ -176,11 +197,11 @@ function startBridge({
       lastError: error.message,
     });
     if (config.codexEndpoint) {
-      console.error(`[remodex] Failed to connect to Codex endpoint: ${config.codexEndpoint}`);
+      console.error(`[rimcodex] Failed to connect to Codex endpoint: ${config.codexEndpoint}`);
     } else {
-      console.error("[remodex] Failed to start `codex app-server`.");
-      console.error(`[remodex] Launch command: ${codex.describe()}`);
-      console.error("[remodex] Make sure the Codex CLI is installed and that the launcher works on this OS.");
+      console.error("[rimcodex] Failed to start `codex app-server`.");
+      console.error(`[rimcodex] Launch command: ${codex.describe()}`);
+      console.error("[rimcodex] Make sure the Codex CLI is installed and that the launcher works on this OS.");
     }
     console.error(error.message);
     process.exit(1);
@@ -249,7 +270,7 @@ function startBridge({
       }
 
       if (hasRelayConnectionGoneStale(lastRelayActivityAt)) {
-        console.warn("[remodex] relay heartbeat stalled; forcing reconnect");
+        console.warn("[rimcodex] relay heartbeat stalled; forcing reconnect");
         logConnectionStatus("disconnected");
         trackedSocket.terminate();
         return;
@@ -277,7 +298,7 @@ function startBridge({
       pid: process.pid,
       lastError: "",
     });
-    console.log(`[remodex] ${status}`);
+    console.log(`[rimcodex] ${status}`);
   }
 
   // Retries the relay socket while preserving the active Codex process and session id.
@@ -330,6 +351,8 @@ function startBridge({
       markRelayActivity();
       clearReconnectTimer();
       reconnectAttempt = 0;
+      requestedBridgeProtocolVersion = 0;
+      lastPublishedBridgeHealthSnapshotJSON = "";
       startRelayWatchdog(nextSocket);
       logConnectionStatus("connected");
       secureTransport.bindLiveSendWireMessage(sendRelayWireMessage);
@@ -383,10 +406,10 @@ function startBridge({
     });
   }
 
-  const pairingPayload = secureTransport.createPairingPayload();
-  onPairingPayload?.(pairingPayload);
-  if (printPairingQr) {
-    printQR(pairingPayload);
+  onPairingSession?.(pairingSession);
+  onPairingPayload?.(pairingSession.pairingPayload);
+  if (shouldPrintPairingCode || printPairingQr) {
+    printPairingCode(pairingSession);
   }
   pushServiceClient.logUnavailable();
   connectRelay();
@@ -401,7 +424,7 @@ function startBridge({
     pushNotificationTracker.handleOutbound(message);
     rememberThreadFromMessage("codex", message);
     secureTransport.queueOutboundApplicationMessage(
-      sanitizeRelayBoundCodexMessage(message),
+      createRelayBoundCodexMessage(message),
       sendRelayWireMessage
     );
   });
@@ -423,6 +446,7 @@ function startBridge({
     desktopRefresher.handleTransportReset();
     failBridgeManagedCodexRequests(new Error("Codex transport closed before the bridge request completed."));
     forwardedRequestMethodsById.clear();
+    bridgeProtocolForwardedRequestsById.clear();
     if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
       socket.close();
     }
@@ -444,6 +468,9 @@ function startBridge({
   // Routes decrypted app payloads through the same bridge handlers as before.
   function handleApplicationMessage(rawMessage) {
     if (handleBridgeManagedHandshakeMessage(rawMessage)) {
+      return;
+    }
+    if (handleBridgeProtocolRequest(rawMessage, sendApplicationResponse)) {
       return;
     }
     if (handleBridgeManagedAccountRequest(rawMessage, sendApplicationResponse)) {
@@ -470,6 +497,7 @@ function startBridge({
     if (handleGitRequest(rawMessage, sendApplicationResponse)) {
       return;
     }
+    forgetResolvedBridgeInboundRequest(rawMessage);
     desktopRefresher.handleInbound(rawMessage);
     rolloutLiveMirror?.observeInbound(rawMessage);
     rememberForwardedRequestMethod(rawMessage);
@@ -480,6 +508,110 @@ function startBridge({
   // Encrypts bridge-generated responses instead of letting the relay see plaintext.
   function sendApplicationResponse(rawMessage) {
     secureTransport.queueOutboundApplicationMessage(rawMessage, sendRelayWireMessage);
+  }
+
+  function handleBridgeProtocolRequest(rawMessage, sendResponse) {
+    const parsed = safeParseJSON(rawMessage);
+    const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
+    const requestId = parsed?.id;
+    if (!method || requestId == null || !isBridgeProtocolMethod(method)) {
+      return false;
+    }
+
+    if (method === "bridge/capabilities") {
+      readBridgePackageVersionStatus()
+        .then((packageVersionStatus) => {
+          sendResponse(JSON.stringify({
+            id: requestId,
+            result: buildBridgeCapabilities({ packageVersionStatus }),
+          }));
+        })
+        .catch((error) => {
+          sendResponse(createJsonRpcErrorResponse(requestId, error, "bridge_capabilities_failed"));
+        });
+      return true;
+    }
+
+    if (method === "bridge/health") {
+      readBridgePackageVersionStatus()
+        .then((packageVersionStatus) => {
+          sendResponse(JSON.stringify({
+            id: requestId,
+            result: buildBridgeHealthSnapshot({
+              bridgeStatus: lastPublishedBridgeStatus,
+              codexHandshakeState,
+              pairingSession: secureTransport.readPairingSession(),
+              packageVersionStatus,
+              pendingApprovalCount: countPendingBridgeApprovals(),
+              lastRelayActivityAt,
+              relayHeartbeatStaleAfterMs: RELAY_WATCHDOG_STALE_AFTER_MS,
+            }),
+          }));
+        })
+        .catch((error) => {
+          sendResponse(createJsonRpcErrorResponse(requestId, error, "bridge_health_failed"));
+        });
+      return true;
+    }
+
+    if (method === "bridge/approval/list") {
+      sendResponse(JSON.stringify({
+        id: requestId,
+        result: {
+          approvals: listPendingBridgeApprovals(),
+        },
+      }));
+      return true;
+    }
+
+    if (method === "bridge/approval/resolve") {
+      resolvePendingBridgeApproval(parsed?.params)
+        .then((result) => {
+          sendResponse(JSON.stringify({
+            id: requestId,
+            result,
+          }));
+        })
+        .catch((error) => {
+          sendResponse(createJsonRpcErrorResponse(requestId, error, "bridge_approval_resolve_failed"));
+        });
+      return true;
+    }
+
+    if (!isBridgeProtocolProxyMethod(method)) {
+      return false;
+    }
+
+    const codexMethod = mapBridgeProtocolMethodToCodexMethod(method);
+    if (!codexMethod) {
+      sendResponse(createJsonRpcErrorResponse(
+        requestId,
+        Object.assign(new Error(`Unsupported bridge method: ${method}`), {
+          errorCode: "unsupported_bridge_method",
+        }),
+        "unsupported_bridge_method"
+      ));
+      return true;
+    }
+
+    const forwardedMessage = JSON.stringify({
+      ...parsed,
+      method: codexMethod,
+    });
+
+    rememberForwardedBridgeProtocolRequest(requestId, method, codexMethod);
+    desktopRefresher.handleInbound(forwardedMessage);
+    rolloutLiveMirror?.observeInbound(forwardedMessage);
+    rememberThreadFromMessage("phone", forwardedMessage);
+
+    try {
+      codex.send(forwardedMessage);
+    } catch (error) {
+      bridgeProtocolForwardedRequestsById.delete(String(requestId));
+      sendResponse(createJsonRpcErrorResponse(requestId, error, "bridge_proxy_forward_failed"));
+    }
+
+    return true;
   }
 
   // ─── Bridge-owned auth snapshot ─────────────────────────────
@@ -723,6 +855,10 @@ function startBridge({
     }
   }
 
+  function safeBridgeParamsObject(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+  }
+
   function rememberThreadFromMessage(source, rawMessage) {
     const context = extractBridgeMessageContext(rawMessage);
     if (!context.threadId) {
@@ -815,6 +951,11 @@ function startBridge({
     }
 
     if (method === "initialize" && parsed.id != null) {
+      const requestedProtocolVersion = extractRequestedBridgeProtocolVersion(parsed.params);
+      if (requestedProtocolVersion > 0) {
+        requestedBridgeProtocolVersion = requestedProtocolVersion;
+      }
+
       if (codexHandshakeState !== "warm") {
         forwardedInitializeRequestIds.add(String(parsed.id));
         return false;
@@ -824,6 +965,7 @@ function startBridge({
         id: parsed.id,
         result: {
           bridgeManaged: true,
+          bridgeProtocolVersion: requestedBridgeProtocolVersion || null,
         },
       }));
       return true;
@@ -859,6 +1001,7 @@ function startBridge({
 
     if (parsed?.result != null) {
       codexHandshakeState = "warm";
+      publishBridgeHealthSnapshotIfNeeded();
       return;
     }
 
@@ -867,6 +1010,7 @@ function startBridge({
       : "";
     if (errorMessage.includes("already initialized")) {
       codexHandshakeState = "warm";
+      publishBridgeHealthSnapshotIfNeeded();
     }
   }
 
@@ -949,9 +1093,10 @@ function startBridge({
   function publishBridgeStatus(status) {
     lastPublishedBridgeStatus = status;
     onBridgeStatus?.(status);
+    publishBridgeHealthSnapshotIfNeeded();
   }
 
-  // Refreshes the relay's trusted-mac index after the QR bootstrap locks in a phone identity.
+  // Refreshes the relay's trusted-mac index after the pairing bootstrap locks in a phone identity.
   function sendRelayRegistrationUpdate(nextDeviceState) {
     deviceState = nextDeviceState;
     if (socket?.readyState !== WebSocket.OPEN) {
@@ -961,7 +1106,207 @@ function startBridge({
     socket.send(JSON.stringify({
       kind: "relayMacRegistration",
       registration: buildMacRegistration(nextDeviceState),
+      pairingSession: buildRelayPairingSession(secureTransport.readPairingSession()),
     }));
+  }
+
+  function createRelayBoundCodexMessage(rawMessage) {
+    const bridgeProtocolRelayMessage = buildBridgeProtocolRelayMessage(rawMessage);
+    if (bridgeProtocolRelayMessage) {
+      return bridgeProtocolRelayMessage;
+    }
+
+    return sanitizeRelayBoundCodexMessage(rawMessage);
+  }
+
+  function buildBridgeProtocolRelayMessage(rawMessage) {
+    pruneExpiredBridgeProtocolState();
+    const parsed = safeParseJSON(rawMessage);
+    if (!parsed) {
+      return null;
+    }
+
+    const responseId = parsed?.id != null ? String(parsed.id) : null;
+    if (responseId) {
+      const trackedRequest = bridgeProtocolForwardedRequestsById.get(responseId);
+      if (trackedRequest) {
+        bridgeProtocolForwardedRequestsById.delete(responseId);
+        const sanitizedRawMessage = sanitizeThreadHistoryImagesForRelay(rawMessage, trackedRequest.codexMethod);
+        const sanitizedParsed = safeParseJSON(sanitizedRawMessage) || parsed;
+
+        if (sanitizedParsed.error) {
+          return JSON.stringify({
+            id: sanitizedParsed.id,
+            error: sanitizedParsed.error,
+          });
+        }
+
+        return JSON.stringify({
+          id: sanitizedParsed.id,
+          result: normalizeBridgeProtocolResult(trackedRequest.bridgeMethod, sanitizedParsed.result ?? null),
+        });
+      }
+    }
+
+    if (!requestedBridgeProtocolVersion || typeof parsed?.method !== "string") {
+      return null;
+    }
+
+    const rawMethod = parsed.method.trim();
+    if (!rawMethod) {
+      return null;
+    }
+
+    if (parsed.id != null) {
+      rememberPendingBridgeInboundRequest(parsed.id, rawMethod, parsed.params);
+      return JSON.stringify(buildBridgeRequestEnvelope(parsed.id, rawMethod, parsed.params ?? null));
+    }
+
+    return JSON.stringify(buildBridgeEventEnvelope(rawMethod, parsed.params ?? null));
+  }
+
+  function rememberForwardedBridgeProtocolRequest(requestId, bridgeMethod, codexMethod) {
+    pruneExpiredBridgeProtocolState();
+    bridgeProtocolForwardedRequestsById.set(String(requestId), {
+      bridgeMethod,
+      codexMethod,
+      createdAt: Date.now(),
+    });
+  }
+
+  function rememberPendingBridgeInboundRequest(requestId, method, params) {
+    pruneExpiredBridgeProtocolState();
+    pendingBridgeInboundRequestsById.set(String(requestId), {
+      requestId: String(requestId),
+      method,
+      params: safeBridgeParamsObject(params),
+      threadId: extractThreadId(method, params),
+      turnId: extractTurnId(method, params),
+      createdAt: Date.now(),
+    });
+    publishBridgeHealthSnapshotIfNeeded();
+  }
+
+  function forgetResolvedBridgeInboundRequest(rawMessage) {
+    const parsed = safeParseJSON(rawMessage);
+    if (!parsed || parsed.method != null || parsed.id == null) {
+      return;
+    }
+
+    pendingBridgeInboundRequestsById.delete(String(parsed.id));
+  }
+
+  function pruneExpiredBridgeProtocolState(now = Date.now()) {
+    for (const [requestId, trackedRequest] of bridgeProtocolForwardedRequestsById.entries()) {
+      if (!trackedRequest || (now - trackedRequest.createdAt) >= forwardedRequestMethodTTLms) {
+        bridgeProtocolForwardedRequestsById.delete(requestId);
+      }
+    }
+
+    for (const [requestId, trackedRequest] of pendingBridgeInboundRequestsById.entries()) {
+      if (!trackedRequest || (now - trackedRequest.createdAt) >= PENDING_BRIDGE_REQUEST_STALE_AFTER_MS) {
+        pendingBridgeInboundRequestsById.delete(requestId);
+      }
+    }
+  }
+
+  function listPendingBridgeApprovals() {
+    pruneExpiredBridgeProtocolState();
+    return Array.from(pendingBridgeInboundRequestsById.values())
+      .filter((entry) => isBridgeApprovalMethod(entry?.method))
+      .map((entry) => ({
+        requestId: entry.requestId,
+        method: entry.method,
+        event: normalizeBridgeEventName(entry.method),
+        threadId: entry.threadId || null,
+        turnId: entry.turnId || null,
+        command: readString(entry.params?.command),
+        reason: readString(entry.params?.reason),
+        requestedAt: entry.createdAt,
+        params: entry.params || null,
+      }));
+  }
+
+  function countPendingBridgeApprovals() {
+    return listPendingBridgeApprovals().length;
+  }
+
+  async function resolvePendingBridgeApproval(params) {
+    const paramsObject = safeBridgeParamsObject(params);
+    const requestId = readString(paramsObject?.requestId)
+      || readString(paramsObject?.requestID)
+      || readString(paramsObject?.id);
+    if (!requestId) {
+      const error = new Error("bridge/approval/resolve requires requestId.");
+      error.errorCode = "missing_request_id";
+      throw error;
+    }
+
+    const pendingRequest = pendingBridgeInboundRequestsById.get(requestId);
+    if (!pendingRequest) {
+      const error = new Error("That approval request is no longer pending.");
+      error.errorCode = "approval_not_found";
+      throw error;
+    }
+
+    const explicitResult = safeBridgeParamsObject(paramsObject?.result);
+    const decision = readString(paramsObject?.decision);
+    let result = explicitResult;
+    if (!result) {
+      if (!decision) {
+        const error = new Error("bridge/approval/resolve requires either result or decision.");
+        error.errorCode = "missing_decision";
+        throw error;
+      }
+      result = {
+        decision,
+      };
+    }
+
+    codex.send(JSON.stringify({
+      id: pendingRequest.requestId,
+      result,
+    }));
+    pendingBridgeInboundRequestsById.delete(requestId);
+    publishBridgeHealthSnapshotIfNeeded();
+
+    return {
+      ok: true,
+      requestId,
+      resolved: true,
+    };
+  }
+
+  function publishBridgeHealthSnapshotIfNeeded() {
+    if (!requestedBridgeProtocolVersion) {
+      return;
+    }
+
+    readBridgePackageVersionStatus()
+      .then((packageVersionStatus) => {
+        const healthSnapshot = buildBridgeHealthSnapshot({
+          bridgeStatus: lastPublishedBridgeStatus,
+          codexHandshakeState,
+          pairingSession: secureTransport.readPairingSession(),
+          packageVersionStatus,
+          pendingApprovalCount: countPendingBridgeApprovals(),
+          lastRelayActivityAt,
+          relayHeartbeatStaleAfterMs: RELAY_WATCHDOG_STALE_AFTER_MS,
+        });
+        const serializedSnapshot = JSON.stringify(healthSnapshot);
+        if (!serializedSnapshot || serializedSnapshot === lastPublishedBridgeHealthSnapshotJSON) {
+          return;
+        }
+
+        lastPublishedBridgeHealthSnapshotJSON = serializedSnapshot;
+        sendApplicationResponse(JSON.stringify({
+          method: "bridge/healthChanged",
+          params: healthSnapshot,
+        }));
+      })
+      .catch(() => {
+        // Best-effort only; `bridge/health` remains available for explicit reads.
+      });
   }
 }
 
@@ -988,6 +1333,26 @@ function buildMacRegistration(deviceState) {
     displayName: normalizeNonEmptyString(os.hostname()),
     trustedPhoneDeviceId: normalizeNonEmptyString(trustedPhoneEntry?.[0]),
     trustedPhonePublicKey: normalizeNonEmptyString(trustedPhoneEntry?.[1]),
+  };
+}
+
+function buildRelayPairingSession(pairingSession) {
+  if (!pairingSession?.pairingPayload) {
+    return null;
+  }
+
+  return {
+    pairingSessionId: normalizeNonEmptyString(pairingSession.pairingSessionId),
+    pairingCode: normalizeNonEmptyString(pairingSession.pairingCode),
+    expiresAt: Number(pairingSession.expiresAt) || 0,
+    pairingPayload: {
+      v: Number(pairingSession.pairingPayload.v) || 0,
+      relay: normalizeNonEmptyString(pairingSession.pairingPayload.relay),
+      sessionId: normalizeNonEmptyString(pairingSession.pairingPayload.sessionId),
+      macDeviceId: normalizeNonEmptyString(pairingSession.pairingPayload.macDeviceId),
+      macIdentityPublicKey: normalizeNonEmptyString(pairingSession.pairingPayload.macIdentityPublicKey),
+      expiresAt: Number(pairingSession.pairingPayload.expiresAt) || 0,
+    },
   };
 }
 
@@ -1062,7 +1427,17 @@ function extractThreadId(method, params) {
     );
   }
 
-  return null;
+  return (
+    readString(params?.threadId)
+    || readString(params?.thread_id)
+    || readString(params?.thread?.id)
+    || readString(params?.thread?.threadId)
+    || readString(params?.thread?.thread_id)
+    || readString(params?.turn?.threadId)
+    || readString(params?.turn?.thread_id)
+    || readString(params?.item?.threadId)
+    || readString(params?.item?.thread_id)
+  );
 }
 
 function extractTurnId(method, params) {
@@ -1077,7 +1452,15 @@ function extractTurnId(method, params) {
     );
   }
 
-  return null;
+  return (
+    readString(params?.turnId)
+    || readString(params?.turn_id)
+    || readString(params?.turn?.id)
+    || readString(params?.turn?.turnId)
+    || readString(params?.turn?.turn_id)
+    || readString(params?.item?.turnId)
+    || readString(params?.item?.turn_id)
+  );
 }
 
 function readString(value) {
@@ -1086,6 +1469,14 @@ function readString(value) {
 
 function normalizeNonEmptyString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function isBridgeApprovalMethod(method) {
+  return method === "item/tool/requestUserInput"
+    || method === "item/commandExecution/requestApproval"
+    || method === "item/command_execution/requestApproval"
+    || method === "item/fileChange/requestApproval"
+    || (typeof method === "string" && method.endsWith("requestApproval"));
 }
 
 // Shrinks `thread/read` and `thread/resume` snapshots by eliding inline image blobs.
