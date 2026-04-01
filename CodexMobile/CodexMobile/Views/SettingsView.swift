@@ -834,6 +834,12 @@ private struct SettingsBridgeVersionCard: View {
                 valueStyle: .primary
             )
 
+            settingsVersionRow(
+                title: "Codex on Mac",
+                value: codexRuntimeVersionLabel,
+                valueStyle: .primary
+            )
+
             if let guidance = guidanceText {
                 Text(guidance)
                     .font(AppFont.caption())
@@ -842,11 +848,13 @@ private struct SettingsBridgeVersionCard: View {
         }
         .task {
             await codex.refreshBridgeVersionState()
+            await codex.refreshBridgeProtocolAvailability()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task {
                 await codex.refreshBridgeVersionState()
+                await codex.refreshBridgeProtocolAvailability()
             }
         }
     }
@@ -857,6 +865,10 @@ private struct SettingsBridgeVersionCard: View {
 
     private var latestVersionLabel: String {
         normalizedVersion(codex.latestBridgePackageVersion) ?? "Unknown"
+    }
+
+    private var codexRuntimeVersionLabel: String {
+        normalizedVersion(codex.bridgeCodexVersion) ?? "Unknown"
     }
 
     private var guidanceText: String? {
