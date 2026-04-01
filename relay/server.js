@@ -142,6 +142,19 @@ async function handleHTTPRequest(req, res, {
     return handleJSONRoute(req, res, async (body) => pushSessionService.notifyCompletion(body));
   }
 
+  if (req.method === "POST" && pathname === "/v1/push/session/notify-event") {
+    if (!pushEnabled) {
+      return writeJSON(res, 404, {
+        ok: false,
+        error: "Not found",
+      });
+    }
+    if (!pushRateLimiter.allow(`${requestKey}:notify-event`)) {
+      return writeRateLimitResponse(res);
+    }
+    return handleJSONRoute(req, res, async (body) => pushSessionService.notifyEvent(body));
+  }
+
   if (req.method === "POST" && pathname === "/v1/trusted/session/resolve") {
     return handleJSONRoute(req, res, async (body) => resolveTrustedMacSession(body));
   }
