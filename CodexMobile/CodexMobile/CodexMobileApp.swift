@@ -22,6 +22,7 @@ struct CodexMobileApp: App {
         WindowGroup {
             ContentView()
                 .environment(codexService)
+                .preferredColorScheme(.dark)
                 .onOpenURL { url in
                     Task { @MainActor in
                         guard CodexService.legacyGPTLoginCallbackEnabled else {
