@@ -135,6 +135,7 @@ extension CodexService {
                 reason: paramsObject?["reason"]?.stringValue,
                 threadId: paramsObject?["threadId"]?.stringValue,
                 turnId: paramsObject?["turnId"]?.stringValue,
+                requestedAt: Date(),
                 params: params
             )
 
@@ -149,13 +150,13 @@ extension CodexService {
                         )
                     } catch {
                         debugRuntimeLog("auto-approve failed method=\(method): \(error.localizedDescription)")
-                        pendingApproval = request
+                        enqueuePendingApproval(request)
                     }
                 }
                 return
             }
 
-            pendingApproval = request
+            enqueuePendingApproval(request)
             return
         }
 
@@ -183,7 +184,15 @@ extension CodexService {
         switch method {
         case "bridge/healthChanged":
             if let paramsObject {
+                let previousPendingApprovalCount = pendingApprovalRequests.count
                 applyBridgeHealthSnapshot(from: paramsObject)
+                if isBridgeProtocolAvailable,
+                   let pendingApprovalCount = bridgeHealthSnapshot?.pendingApprovalCount,
+                   pendingApprovalCount != previousPendingApprovalCount {
+                    Task { @MainActor [weak self] in
+                        await self?.refreshPendingApprovals()
+                    }
+                }
             }
 
         case "thread/started":
