@@ -49,6 +49,7 @@ function isBridgeProtocolMethod(method) {
   return typeof method === "string"
     && (method === "bridge/capabilities"
       || method === "bridge/health"
+      || method === "bridge/diagnostics/read"
       || method === "bridge/approval/list"
       || method === "bridge/approval/resolve"
       || Boolean(BRIDGE_PROXY_METHOD_TO_CODEX_METHOD[method]));
@@ -71,6 +72,7 @@ function buildBridgeCapabilities({ packageVersionStatus = null } = {}) {
     methods: Object.keys(BRIDGE_PROXY_METHOD_TO_CODEX_METHOD).concat([
       "bridge/capabilities",
       "bridge/health",
+      "bridge/diagnostics/read",
       "bridge/approval/list",
       "bridge/approval/resolve",
       "account/status/read",
@@ -82,6 +84,7 @@ function buildBridgeCapabilities({ packageVersionStatus = null } = {}) {
       turnStreaming: true,
       approvalQueue: true,
       bridgeHealth: true,
+      bridgeDiagnostics: true,
       bridgeCapabilities: true,
       accountStatusRead: true,
       voiceResolveAuth: true,
