@@ -160,7 +160,10 @@ extension CodexService {
             guard let payloadObject = response.result?.objectValue else {
                 throw CodexServiceError.invalidResponse("bridge/health response missing payload")
             }
+            let previousHealthState = bridgeHealthState
             applyBridgeHealthSnapshot(from: payloadObject)
+            let nextHealthState = bridgeHealthState
+            notifyBridgeHealthTransitionIfNeeded(from: previousHealthState, to: nextHealthState)
         } catch {
             if shouldTreatAsUnsupportedBridgeProtocol(error) {
                 bridgeProtocolAvailability = .unsupported
