@@ -4,7 +4,7 @@
 # Purpose: Starts a local relay plus the public bridge for OSS and self-host workflows.
 # Layer: developer utility
 # Exports: none
-# Depends on: node, npm, curl, relay/server.js, phodex-bridge/bin/remodex.js
+# Depends on: node, npm, curl, relay/server.js, phodex-bridge/bin/rimcodex.js
 
 set -euo pipefail
 
@@ -21,17 +21,17 @@ RELAY_PID=""
 BRIDGE_SERVICE_STARTED="false"
 
 log() {
-  echo "[run-local-remodex] $*"
+  echo "[run-local-rimcodex] $*"
 }
 
 die() {
-  echo "[run-local-remodex] $*" >&2
+  echo "[run-local-rimcodex] $*" >&2
   exit 1
 }
 
 usage() {
   cat <<'EOF'
-Usage: ./run-local-remodex.sh [options]
+Usage: ./run-local-rimcodex.sh [options]
 
 Options:
   --hostname HOSTNAME   Hostname or IP the iPhone should use to reach the relay
@@ -127,7 +127,7 @@ cleanup() {
   if [[ "${BRIDGE_SERVICE_STARTED}" == "true" ]]; then
     (
       cd "${BRIDGE_DIR}"
-      node ./bin/remodex.js stop >/dev/null 2>&1 || true
+      node ./bin/rimcodex.js stop >/dev/null 2>&1 || true
     )
   fi
 
@@ -161,7 +161,7 @@ ensure_prerequisites() {
   ensure_node_version
 }
 
-# Validates the advertised host before boot so the QR cannot point at another machine by mistake.
+# Validates the advertised host before boot so the pairing metadata cannot point at another machine by mistake.
 ensure_hostname_belongs_to_this_mac() {
   node -e '
 const dns = require("node:dns");
@@ -286,7 +286,7 @@ NODE
 
 print_summary() {
   cat <<EOF
-[run-local-remodex] Configuration
+[run-local-rimcodex] Configuration
   Relay bind host : ${RELAY_BIND_HOST}
   Relay port      : ${RELAY_PORT}
   Relay hostname  : ${RELAY_HOSTNAME}
@@ -298,15 +298,15 @@ EOF
 start_bridge() {
   log "Starting bridge"
   cd "${BRIDGE_DIR}"
-  # The bridge bakes REMODEX_RELAY into the pairing QR, so advertise the host
+  # The bridge bakes RIMCODEX_RELAY into the pairing metadata, so advertise the host
   # the iPhone can actually reach instead of the loopback health-check host.
-  REMODEX_RELAY="ws://${RELAY_HOSTNAME}:${RELAY_PORT}/relay" node ./bin/remodex.js up
+  RIMCODEX_RELAY="ws://${RELAY_HOSTNAME}:${RELAY_PORT}/relay" node ./bin/rimcodex.js up
   BRIDGE_SERVICE_STARTED="true"
 }
 
 hold_open() {
   log "Local relay is ready. Keep this terminal open while testing."
-  log "Press Ctrl+C to stop both the local relay and the Remodex bridge service."
+  log "Press Ctrl+C to stop both the local relay and the rimcodex bridge service."
   wait "${RELAY_PID}"
 }
 
