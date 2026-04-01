@@ -157,6 +157,49 @@ test("completion pushes are rejected after the mac relay session disconnects", a
   });
 });
 
+test("generic bridge event pushes are accepted while the mac relay session is live", async () => {
+  await withServer(async ({ port }) => {
+    const mac = new WebSocket(`ws://127.0.0.1:${port}/relay/session-push-event`, {
+      headers: {
+        "x-role": "mac",
+        "x-notification-secret": "bridge-secret",
+      },
+    });
+    await onceOpen(mac);
+
+    const accepted = await fetch(`http://127.0.0.1:${port}/v1/push/session/register-device`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "session-push-event",
+        notificationSecret: "bridge-secret",
+        deviceToken: "aabbcc",
+        alertsEnabled: true,
+      }),
+    });
+    assert.equal(accepted.status, 200);
+
+    const response = await fetch(`http://127.0.0.1:${port}/v1/push/session/notify-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "session-push-event",
+        notificationSecret: "bridge-secret",
+        eventType: "approval_needed",
+        threadId: "thread-1",
+        dedupeKey: "approval-needed-1",
+      }),
+    });
+    assert.equal(response.status, 200);
+
+    const macClosed = onceClosed(mac);
+    mac.close();
+    await macClosed;
+  }, {
+    enablePushService: true,
+  });
+});
+
 test("trusted session resolve returns the current live session for a trusted iphone", async () => {
   const phoneIdentity = makePhoneIdentity();
 
