@@ -47,6 +47,15 @@ test("buildBridgeCapabilities reports bridge protocol envelopes and versions", (
         bridgeVersion: "1.2.3",
         bridgeLatestVersion: "1.2.9",
       },
+      runtimeCapabilitySnapshot: {
+        codexVersion: "0.43.1",
+        probedAt: 123456,
+        capabilities: {
+          planCollaborationMode: true,
+          serviceTier: false,
+          threadFork: true,
+        },
+      },
     }),
     {
       bridgeManaged: true,
@@ -85,6 +94,15 @@ test("buildBridgeCapabilities reports bridge protocol envelopes and versions", (
       },
       bridgeVersion: "1.2.3",
       bridgeLatestVersion: "1.2.9",
+      codexVersion: "0.43.1",
+      runtimeCapabilities: {
+        planCollaborationMode: true,
+        serviceTier: false,
+        threadFork: true,
+        accountStatusRead: true,
+        voiceResolveAuth: true,
+      },
+      runtimeCapabilityProbeAt: 123456,
     }
   );
 });
