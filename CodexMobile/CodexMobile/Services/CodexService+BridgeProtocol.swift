@@ -100,10 +100,12 @@ extension CodexService {
         guard isConnected else {
             bridgeHealthSnapshot = nil
             applyGPTAccountConnectionFallback()
+            clearPendingApprovals()
             return
         }
 
         await refreshBridgeProtocolState()
+        await refreshPendingApprovals()
         await refreshBridgeManagedState(allowAvailableBridgeUpdatePrompt: allowAvailableBridgeUpdatePrompt)
     }
 
@@ -164,6 +166,27 @@ extension CodexService {
                 bridgeProtocolAvailability = .unsupported
             }
             bridgeHealthSnapshot = nil
+        }
+    }
+
+    func refreshPendingApprovals() async {
+        guard isConnected else {
+            clearPendingApprovals()
+            return
+        }
+
+        guard isBridgeProtocolAvailable else {
+            return
+        }
+
+        do {
+            let response = try await sendRequest(method: "bridge/approval/list", params: nil)
+            let approvals = decodeBridgeApprovalRequests(from: response.result?.objectValue)
+            replacePendingApprovals(approvals)
+        } catch {
+            if shouldTreatAsUnsupportedBridgeProtocol(error) {
+                bridgeProtocolAvailability = .unsupported
+            }
         }
     }
 
@@ -298,6 +321,41 @@ extension CodexService {
             event: firstStringValue(in: paramsObject, keys: ["event"]),
             rawMethod: firstStringValue(in: paramsObject, keys: ["rawMethod", "raw_method"]),
             rawParams: paramsObject["rawParams"] ?? paramsObject["raw_params"]
+        )
+    }
+
+    private func decodeBridgeApprovalRequests(from payloadObject: IncomingParamsObject?) -> [CodexApprovalRequest] {
+        let approvalItems = payloadObject?["approvals"]?.arrayValue
+            ?? payloadObject?["items"]?.arrayValue
+            ?? []
+        return approvalItems.compactMap(decodeBridgeApprovalRequest(from:))
+    }
+
+    private func decodeBridgeApprovalRequest(from value: JSONValue) -> CodexApprovalRequest? {
+        guard let objectValue = value.objectValue else {
+            return nil
+        }
+
+        let requestId = firstStringValue(in: objectValue, keys: ["requestId", "requestID", "id"]) ?? ""
+        guard !requestId.isEmpty else {
+            return nil
+        }
+
+        let requestedAtMilliseconds = firstIntValue(in: objectValue, keys: ["requestedAt", "requested_at"])
+        let requestedAt = requestedAtMilliseconds.map { milliseconds in
+            Date(timeIntervalSince1970: TimeInterval(milliseconds) / 1000)
+        }
+
+        return CodexApprovalRequest(
+            id: idKey(from: .string(requestId)),
+            requestID: .string(requestId),
+            method: firstStringValue(in: objectValue, keys: ["method"]) ?? "approval/request",
+            command: firstStringValue(in: objectValue, keys: ["command"]),
+            reason: firstStringValue(in: objectValue, keys: ["reason"]),
+            threadId: firstStringValue(in: objectValue, keys: ["threadId", "thread_id"]),
+            turnId: firstStringValue(in: objectValue, keys: ["turnId", "turn_id"]),
+            requestedAt: requestedAt,
+            params: objectValue["params"]
         )
     }
 }
