@@ -139,7 +139,7 @@ extension CodexService {
         isInitialized = false
         isLoadingThreads = false
         isLoadingModels = false
-        pendingApproval = nil
+        clearPendingApprovals()
         finalizeAllStreamingState()
         messagePersistenceDebounceTask?.cancel()
         messagePersistenceDebounceTask = nil
@@ -391,7 +391,7 @@ extension CodexService {
         activeTurnIdByThread.removeAll()
         refreshAllThreadTimelineStates()
         threadIdByTurnID.removeAll()
-        pendingApproval = nil
+        clearPendingApprovals()
         currentOutput = ""
         lastErrorMessage = nil
         isLoadingModels = false
