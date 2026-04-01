@@ -336,11 +336,11 @@ struct TurnView: View {
             gitSyncAlert: gitSyncAlertBinding,
             isShowingMacHandoffConfirm: $isShowingMacHandoffConfirm,
             macHandoffErrorMessage: $macHandoffErrorMessage,
-            onDeclineApproval: {
-                viewModel.decline(codex: codex)
+            onDeclineApproval: { request in
+                viewModel.decline(request, codex: codex)
             },
-            onApproveApproval: {
-                viewModel.approve(codex: codex)
+            onApproveApproval: { request in
+                viewModel.approve(request, codex: codex)
             },
             onConfirmGitSyncAction: { alertAction in
                 viewModel.confirmGitSyncAlertAction(
@@ -992,15 +992,7 @@ struct TurnView: View {
     }
 
     private var approvalForThread: CodexApprovalRequest? {
-        guard let request = codex.pendingApproval else {
-            return nil
-        }
-
-        guard let requestThreadID = request.threadId else {
-            return request
-        }
-
-        return requestThreadID == thread.id ? request : nil
+        codex.pendingApproval(forThreadId: thread.id)
     }
 
     private var parentThread: CodexThread? {
