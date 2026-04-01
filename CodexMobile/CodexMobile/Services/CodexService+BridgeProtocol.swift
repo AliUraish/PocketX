@@ -29,6 +29,10 @@ struct CodexBridgeHealthSnapshot: Equatable, Sendable {
     let bridgeLatestVersion: String?
 }
 
+private struct CodexBridgeDiagnosticEnvelope: Equatable, Sendable {
+    let events: [CodexBridgeDiagnosticEvent]
+}
+
 private struct CodexBridgeEnvelope {
     let event: String?
     let rawMethod: String?
@@ -106,6 +110,7 @@ extension CodexService {
 
         await refreshBridgeProtocolState()
         await refreshPendingApprovals()
+        await refreshBridgeDiagnostics()
         await refreshBridgeManagedState(allowAvailableBridgeUpdatePrompt: allowAvailableBridgeUpdatePrompt)
     }
 
@@ -183,6 +188,32 @@ extension CodexService {
             let response = try await sendRequest(method: "bridge/approval/list", params: nil)
             let approvals = decodeBridgeApprovalRequests(from: response.result?.objectValue)
             replacePendingApprovals(approvals)
+        } catch {
+            if shouldTreatAsUnsupportedBridgeProtocol(error) {
+                bridgeProtocolAvailability = .unsupported
+            }
+        }
+    }
+
+    func refreshBridgeDiagnostics(limit: Int = 25) async {
+        guard isConnected else {
+            bridgeDiagnosticEvents = []
+            return
+        }
+
+        guard isBridgeProtocolAvailable else {
+            return
+        }
+
+        do {
+            let response = try await sendRequest(
+                method: "bridge/diagnostics/read",
+                params: .object([
+                    "limit": .integer(max(1, min(limit, 100))),
+                ])
+            )
+            let diagnostics = decodeBridgeDiagnosticEnvelope(from: response.result?.objectValue)
+            bridgeDiagnosticEvents = diagnostics.events
         } catch {
             if shouldTreatAsUnsupportedBridgeProtocol(error) {
                 bridgeProtocolAvailability = .unsupported
@@ -356,6 +387,49 @@ extension CodexService {
             turnId: firstStringValue(in: objectValue, keys: ["turnId", "turn_id"]),
             requestedAt: requestedAt,
             params: objectValue["params"]
+        )
+    }
+
+    private func decodeBridgeDiagnosticEnvelope(from payloadObject: IncomingParamsObject?) -> CodexBridgeDiagnosticEnvelope {
+        let events = payloadObject?["events"]?.arrayValue?.compactMap(decodeBridgeDiagnosticEvent(from:)) ?? []
+        return CodexBridgeDiagnosticEnvelope(events: events)
+    }
+
+    private func decodeBridgeDiagnosticEvent(from value: JSONValue) -> CodexBridgeDiagnosticEvent? {
+        guard let objectValue = value.objectValue else {
+            return nil
+        }
+
+        let id = firstStringValue(in: objectValue, keys: ["id"]) ?? UUID().uuidString
+        let type = firstStringValue(in: objectValue, keys: ["type"]) ?? ""
+        let level = firstStringValue(in: objectValue, keys: ["level"]) ?? "info"
+        let message = firstStringValue(in: objectValue, keys: ["message"]) ?? ""
+        let recordedAtMilliseconds = firstIntValue(in: objectValue, keys: ["recordedAt", "recorded_at"]) ?? 0
+        guard !type.isEmpty, !message.isEmpty, recordedAtMilliseconds > 0 else {
+            return nil
+        }
+
+        var metadata: [String: String] = [:]
+        if let metadataObject = objectValue["metadata"]?.objectValue {
+            for (key, rawValue) in metadataObject {
+                if let stringValue = rawValue.stringValue, !stringValue.isEmpty {
+                    metadata[key] = stringValue
+                } else if let intValue = rawValue.intValue {
+                    metadata[key] = String(intValue)
+                } else if let boolValue = rawValue.boolValue {
+                    metadata[key] = boolValue ? "true" : "false"
+                }
+            }
+        }
+
+        return CodexBridgeDiagnosticEvent(
+            id: id,
+            type: type,
+            level: level,
+            message: message,
+            detail: firstStringValue(in: objectValue, keys: ["detail"]),
+            recordedAt: Date(timeIntervalSince1970: TimeInterval(recordedAtMilliseconds) / 1000),
+            metadata: metadata
         )
     }
 }
