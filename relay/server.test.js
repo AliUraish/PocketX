@@ -732,7 +732,7 @@ function buildTrustedResolveTranscript({
   timestamp,
 }) {
   return Buffer.concat([
-    encodeLengthPrefixedUTF8("remodex-trusted-session-resolve-v1"),
+    encodeLengthPrefixedUTF8("rimcodex-trusted-session-resolve-v1"),
     encodeLengthPrefixedUTF8(macDeviceId),
     encodeLengthPrefixedUTF8(phoneDeviceId),
     encodeLengthPrefixedData(Buffer.from(phoneIdentityPublicKey, "base64")),

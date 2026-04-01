@@ -1,5 +1,5 @@
 // FILE: server.js
-// Purpose: Hosts the public Remodex relay plus optional push-notification HTTP endpoints.
+// Purpose: Hosts the public rimcodex relay plus optional push-notification HTTP endpoints.
 // Layer: Standalone server entrypoint
 // Exports: createRelayServer, createFixedWindowRateLimiter
 // Depends on: http, ws, ./relay, ./push-service
@@ -10,6 +10,7 @@ const {
   setupRelay,
   getRelayStats,
   hasAuthenticatedMacSession,
+  claimPairingCode,
   resolveTrustedMacSession,
 } = require("./relay");
 const { createPushSessionService } = require("./push-service");
@@ -143,6 +144,10 @@ async function handleHTTPRequest(req, res, {
 
   if (req.method === "POST" && pathname === "/v1/trusted/session/resolve") {
     return handleJSONRoute(req, res, async (body) => resolveTrustedMacSession(body));
+  }
+
+  if (req.method === "POST" && pathname === "/v1/pairing/code/claim") {
+    return handleJSONRoute(req, res, async (body) => claimPairingCode(body));
   }
 
   return writeJSON(res, 404, {
@@ -350,9 +355,13 @@ function createFixedWindowRateLimiter({ windowMs, maxRequests, now = () => Date.
 
 if (require.main === module) {
   const port = Number(process.env.PORT || 9000);
-  const trustProxy = readOptionalBooleanEnv(["REMODEX_TRUST_PROXY", "PHODEX_TRUST_PROXY"]) ?? false;
+  const trustProxy = readOptionalBooleanEnv([
+    "RIMCODEX_TRUST_PROXY",
+    "REMODEX_TRUST_PROXY",
+    "PHODEX_TRUST_PROXY",
+  ]) ?? false;
   const enablePushService = readOptionalBooleanEnv(
-    ["REMODEX_ENABLE_PUSH_SERVICE", "PHODEX_ENABLE_PUSH_SERVICE"]
+    ["RIMCODEX_ENABLE_PUSH_SERVICE", "REMODEX_ENABLE_PUSH_SERVICE", "PHODEX_ENABLE_PUSH_SERVICE"]
   ) ?? false;
   const { server } = createRelayServer({ enablePushService, trustProxy });
   server.listen(port, () => {
