@@ -63,6 +63,53 @@ test("push service stores device registration and sends one completion alert", a
   assert.equal(sent[0].payload.threadId, "thread-1");
 });
 
+test("push service sends one generic bridge event alert", async () => {
+  const sent = [];
+  const service = createPushSessionService({
+    apnsClient: {
+      isConfigured: () => true,
+      async sendNotification(payload) {
+        sent.push(payload);
+      },
+    },
+    canRegisterSession: () => true,
+  });
+
+  await service.registerDevice({
+    sessionId: "session-event-1",
+    notificationSecret: "secret-event-1",
+    deviceToken: "aabbcc",
+    alertsEnabled: true,
+  });
+
+  await service.notifyEvent({
+    sessionId: "session-event-1",
+    notificationSecret: "secret-event-1",
+    eventType: "approval_needed",
+    threadId: "thread-event-1",
+    turnId: "turn-event-1",
+    dedupeKey: "approval-1",
+    title: "rimcodex approval needed",
+    body: "Approval needed to continue the run.",
+    eventPayload: {
+      requestId: "request-1",
+    },
+  });
+
+  await service.notifyEvent({
+    sessionId: "session-event-1",
+    notificationSecret: "secret-event-1",
+    eventType: "approval_needed",
+    dedupeKey: "approval-1",
+  });
+
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].payload.source, "codex.bridgeEvent");
+  assert.equal(sent[0].payload.eventType, "approval_needed");
+  assert.equal(sent[0].payload.threadId, "thread-event-1");
+  assert.equal(sent[0].payload.requestId, "request-1");
+});
+
 test("push service rejects registration when the relay session is not active", async () => {
   const service = createPushSessionService({
     apnsClient: {
