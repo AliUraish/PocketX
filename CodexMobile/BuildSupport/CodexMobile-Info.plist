@@ -9,7 +9,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Remodex</string>
+	<string>rimcodex</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -28,10 +28,10 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.emanueledipietro.CodexMobile.auth</string>
+			<string>com.emanueledipietro.rimcodex.auth</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>phodex</string>
+				<string>rimcodex</string>
 			</array>
 		</dict>
 	</array>
@@ -40,7 +40,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Remodex needs camera access to let you take photos and attach them to your messages.</string>
+	<string>rimcodex needs camera access to let you take photos and attach them to your messages.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -51,21 +51,27 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>CodexMobile needs local network access to connect to your Codex app-server running on your Mac.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Remodex needs microphone access to record voice notes for ChatGPT transcription.</string>
+	<string>rimcodex needs microphone access to record voice notes for ChatGPT transcription.</string>
 	<key>NSBonjourServices</key>
 	<array>
-		<string>_remodex-permission._tcp</string>
+		<string>_rimcodex-permission._tcp</string>
 	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>CodexMobile needs photo library access to let you attach images to your messages.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Remodex needs photo library access to let you save rendered diagrams and attachments.</string>
+	<string>rimcodex needs photo library access to let you save rendered diagrams and attachments.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>PHODEX_CHATGPT_CALLBACK_SCHEME</key>
 	<string>$(PHODEX_CHATGPT_CALLBACK_SCHEME)</string>
-	<key>PHODEX_DEFAULT_RELAY_URL</key>
-	<string>$(PHODEX_DEFAULT_RELAY_URL)</string>
+	<key>RIMCODEX_DEFAULT_RELAY_URL</key>
+	<string>$(RIMCODEX_DEFAULT_RELAY_URL)</string>
+	<key>RIMCODEX_SOURCE_REPOSITORY_URL</key>
+	<string>$(RIMCODEX_SOURCE_REPOSITORY_URL)</string>
+	<key>RIMCODEX_PRIVACY_POLICY_URL</key>
+	<string>$(RIMCODEX_PRIVACY_POLICY_URL)</string>
+	<key>RIMCODEX_TERMS_OF_USE_URL</key>
+	<string>$(RIMCODEX_TERMS_OF_USE_URL)</string>
 	<key>REVENUECAT_PUBLIC_API_KEY</key>
 	<string>$(REVENUECAT_PUBLIC_API_KEY)</string>
 	<key>REVENUECAT_ENTITLEMENT_NAME</key>
