@@ -34,6 +34,40 @@ extension CodexService {
         firstLiveThreadIDCache
     }
 
+    func rememberLastOpenedThreadID(_ threadId: String?) {
+        guard let normalizedThreadId = normalizedForkThreadID(threadId) else {
+            return
+        }
+
+        defaults.set(normalizedThreadId, forKey: Self.lastOpenedThreadIDDefaultsKey)
+    }
+
+    func rememberedLastOpenedThreadID() -> String? {
+        normalizedForkThreadID(defaults.string(forKey: Self.lastOpenedThreadIDDefaultsKey))
+    }
+
+    func clearRememberedLastOpenedThreadID(ifMatches threadId: String? = nil) {
+        guard let rememberedThreadID = rememberedLastOpenedThreadID() else {
+            return
+        }
+
+        if let normalizedThreadId = normalizedForkThreadID(threadId),
+           rememberedThreadID != normalizedThreadId {
+            return
+        }
+
+        defaults.removeObject(forKey: Self.lastOpenedThreadIDDefaultsKey)
+    }
+
+    func preferredVisibleThreadID() -> String? {
+        if let rememberedThreadID = rememberedLastOpenedThreadID(),
+           thread(for: rememberedThreadID)?.syncState == .live {
+            return rememberedThreadID
+        }
+
+        return firstLiveThreadID()
+    }
+
     func resolveThreadID(_ preferredThreadID: String?) async throws -> String {
         if let preferredThreadID, !preferredThreadID.isEmpty {
             return preferredThreadID
