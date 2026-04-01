@@ -19,7 +19,7 @@ const DESKTOP_RESUME_METHODS = new Set(["thread/read", "thread/resume"]);
 // bridge notifications so the phone can render live thinking/tool activity.
 function createRolloutLiveMirrorController({
   sendApplicationResponse,
-  logPrefix = "[remodex]",
+  logPrefix = "[rimcodex]",
   fsModule = fs,
   now = () => Date.now(),
   setIntervalFn = setInterval,

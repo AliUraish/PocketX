@@ -196,9 +196,9 @@ function watchThreadRollout(threadId = "") {
   let offset = fs.statSync(rolloutPath).size;
   let partialLine = "";
 
-  console.log(`[remodex] Watching thread ${resolvedThreadId}`);
-  console.log(`[remodex] Rollout file: ${rolloutPath}`);
-  console.log("[remodex] Waiting for new persisted events... (Ctrl+C to stop)");
+  console.log(`[rimcodex] Watching thread ${resolvedThreadId}`);
+  console.log(`[rimcodex] Rollout file: ${rolloutPath}`);
+  console.log("[rimcodex] Waiting for new persisted events... (Ctrl+C to stop)");
 
   const onChange = (current, previous) => {
     if (current.size <= previous.size) {
@@ -252,7 +252,7 @@ function resolveThreadId(threadId) {
     return last.threadId;
   }
 
-  throw new Error("No thread id provided and no remembered Remodex thread found.");
+  throw new Error("No thread id provided and no remembered rimcodex thread found.");
 }
 
 function resolveSessionsRoot() {
