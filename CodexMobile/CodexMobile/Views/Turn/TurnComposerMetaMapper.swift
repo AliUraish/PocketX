@@ -11,7 +11,7 @@ enum TurnComposerMetaMapper {
     // ─── Model Mapping ────────────────────────────────────────────────
 
     // Returns models sorted using the explicit product order expected by the UI.
-    static func orderedModels(from models: [CodexModelOption]) -> [CodexModelOption] {
+    nonisolated static func orderedModels(from models: [CodexModelOption]) -> [CodexModelOption] {
         let preferredOrder: [String] = [
             "gpt-5.1-codex-mini",
             "gpt-5.2",
@@ -34,7 +34,7 @@ enum TurnComposerMetaMapper {
     }
 
     // Normalizes backend ids into consistent menu labels.
-    static func modelTitle(for model: CodexModelOption) -> String {
+    nonisolated static func modelTitle(for model: CodexModelOption) -> String {
         switch model.model.lowercased() {
         case "gpt-5.3-codex":
             return "GPT-5.3-Codex"
@@ -56,7 +56,7 @@ enum TurnComposerMetaMapper {
     // ─── Reasoning Mapping ───────────────────────────────────────────
 
     // Converts server effort values to user-facing labels and sorts them by level.
-    static func reasoningDisplayOptions(from efforts: [String]) -> [TurnComposerReasoningDisplayOption] {
+    nonisolated static func reasoningDisplayOptions(from efforts: [String]) -> [TurnComposerReasoningDisplayOption] {
         efforts
             .map { effort in
                 TurnComposerReasoningDisplayOption(
@@ -73,7 +73,7 @@ enum TurnComposerMetaMapper {
     }
 
     // Maps raw effort values to user-facing labels.
-    static func reasoningTitle(for effort: String) -> String {
+    nonisolated static func reasoningTitle(for effort: String) -> String {
         let normalized = effort
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
