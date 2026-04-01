@@ -118,6 +118,7 @@ extension CodexService {
         guard isConnected else {
             bridgeProtocolAvailability = .unknown
             bridgeHealthSnapshot = nil
+            bridgeCodexVersion = nil
             return
         }
 
@@ -136,18 +137,12 @@ extension CodexService {
                 bridgeProtocolAvailability = .unsupported
             }
 
-            bridgeInstalledVersion = firstStringValue(
-                in: payloadObject,
-                keys: ["bridgeVersion", "bridge_version", "bridgePackageVersion", "bridge_package_version"]
-            )
-            latestBridgePackageVersion = firstStringValue(
-                in: payloadObject,
-                keys: ["bridgeLatestVersion", "bridge_latest_version", "bridgePublishedVersion", "bridge_published_version"]
-            )
+            applyBridgeCapabilitySnapshot(from: payloadObject)
         } catch {
             if shouldTreatAsUnsupportedBridgeProtocol(error) {
                 bridgeProtocolAvailability = .unsupported
                 bridgeHealthSnapshot = nil
+                bridgeCodexVersion = nil
             } else {
                 bridgeProtocolAvailability = .unknown
             }
@@ -307,6 +302,54 @@ extension CodexService {
             bridgeVersion: bridgeInstalledVersion,
             bridgeLatestVersion: latestBridgePackageVersion
         )
+    }
+
+    func applyBridgeCapabilitySnapshot(from payloadObject: IncomingParamsObject) {
+        bridgeInstalledVersion = firstStringValue(
+            in: payloadObject,
+            keys: ["bridgeVersion", "bridge_version", "bridgePackageVersion", "bridge_package_version"]
+        )
+        latestBridgePackageVersion = firstStringValue(
+            in: payloadObject,
+            keys: ["bridgeLatestVersion", "bridge_latest_version", "bridgePublishedVersion", "bridge_published_version"]
+        )
+        bridgeCodexVersion = firstStringValue(
+            in: payloadObject,
+            keys: ["codexVersion", "codex_version", "runtimeVersion", "runtime_version"]
+        )
+
+        let runtimeCapabilities = payloadObject["runtimeCapabilities"]?.objectValue
+            ?? payloadObject["runtime_capabilities"]?.objectValue
+            ?? payloadObject["capabilities"]?.objectValue?["runtimeCapabilities"]?.objectValue
+            ?? payloadObject["capabilities"]?.objectValue?["runtime_capabilities"]?.objectValue
+
+        if let planSupport = firstBoolValue(
+            in: runtimeCapabilities,
+            keys: ["planCollaborationMode", "plan_collaboration_mode"]
+        ) {
+            supportsTurnCollaborationMode = planSupport
+        }
+
+        if let serviceTierSupport = firstBoolValue(
+            in: runtimeCapabilities,
+            keys: ["serviceTier", "service_tier"]
+        ) {
+            supportsServiceTier = serviceTierSupport
+        }
+
+        if let threadForkSupport = firstBoolValue(
+            in: runtimeCapabilities,
+            keys: ["threadFork", "thread_fork"]
+        ) {
+            supportsThreadFork = threadForkSupport
+        }
+
+        if let voiceAuthSupport = firstBoolValue(
+            in: runtimeCapabilities,
+            keys: ["voiceResolveAuth", "voice_resolve_auth"]
+        ) {
+            supportsBridgeVoiceAuth = voiceAuthSupport
+        }
     }
 
     func shouldTreatAsUnsupportedBridgeProtocol(_ error: Error) -> Bool {
