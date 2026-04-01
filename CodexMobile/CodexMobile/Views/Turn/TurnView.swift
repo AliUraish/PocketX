@@ -418,6 +418,16 @@ struct TurnView: View {
             return nil
         }
 
+        if codex.isConnecting || codex.shouldAutoReconnectOnForeground || isRetryingConnectionRecovery,
+           let presentation = codex.bridgeHealthPresentation {
+            return ConnectionRecoverySnapshot(
+                summary: presentation.summary,
+                detail: presentation.detail,
+                status: .reconnecting,
+                trailingStyle: .progress
+            )
+        }
+
         if codex.isConnecting || codex.shouldAutoReconnectOnForeground || isRetryingConnectionRecovery {
             return ConnectionRecoverySnapshot(
                 summary: "Trying to reconnect to your Mac.",
@@ -426,15 +436,18 @@ struct TurnView: View {
             )
         }
 
+        let presentation = codex.bridgeHealthPresentation
         let trimmedError = codex.lastErrorMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let summary = {
-            guard let trimmedError, !trimmedError.isEmpty else {
-                return "Reconnect to your Mac to keep this chat in sync."
-            }
-            return trimmedError
-        }()
+        let summary = presentation?.summary
+            ?? {
+                guard let trimmedError, !trimmedError.isEmpty else {
+                    return "Reconnect to your Mac to keep this chat in sync."
+                }
+                return trimmedError
+            }()
         return ConnectionRecoverySnapshot(
             summary: summary,
+            detail: presentation?.detail,
             status: .interrupted,
             trailingStyle: .action("Reconnect")
         )
@@ -1316,7 +1329,7 @@ struct TurnView: View {
                 snapshot: ConnectionRecoverySnapshot(
                     title: "Voice Mode",
                     summary: "Reconnect to your Mac to use voice mode.",
-                    detail: "Keep the Remodex bridge running on your Mac, then try the microphone again.",
+                    detail: "Keep the rimcodex bridge running on your Mac, then try the microphone again.",
                     status: .interrupted,
                     trailingStyle: .action("Reconnect")
                 ),
@@ -1327,7 +1340,7 @@ struct TurnView: View {
                 snapshot: ConnectionRecoverySnapshot(
                     title: "Voice Mode",
                     summary: "This bridge session does not support voice mode yet.",
-                    detail: "Restart Remodex on your Mac, then reconnect this iPhone. If it still happens, update Remodex on your Mac and pair again.",
+                    detail: "Restart rimcodex on your Mac, then reconnect this iPhone. If it still happens, update rimcodex on your Mac and pair again.",
                     status: .actionRequired,
                     trailingStyle: .action("Reconnect")
                 ),
@@ -1381,8 +1394,8 @@ struct TurnView: View {
             return VoiceRecoveryPresentation(
                 snapshot: ConnectionRecoverySnapshot(
                     title: "Voice Mode",
-                    summary: "Microphone access is off for Remodex.",
-                    detail: "Open iPhone Settings, allow Microphone for Remodex, then try recording again.",
+                    summary: "Microphone access is off for rimcodex.",
+                    detail: "Open iPhone Settings, allow Microphone for rimcodex, then try recording again.",
                     status: .actionRequired,
                     trailingStyle: .action("Open Settings")
                 ),
@@ -1403,7 +1416,7 @@ struct TurnView: View {
             return VoiceRecoveryPresentation(
                 snapshot: ConnectionRecoverySnapshot(
                     title: "Voice Mode",
-                    summary: "Remodex could not start the recorder.",
+                    summary: "rimcodex could not start the recorder.",
                     detail: "Close other audio-heavy apps, then try voice mode again.",
                     status: .actionRequired,
                     trailingStyle: .none
