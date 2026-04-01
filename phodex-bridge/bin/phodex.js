@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // FILE: phodex.js
-// Purpose: Backward-compatible wrapper that forwards legacy `phodex up` usage to `remodex up`.
+// Purpose: Backward-compatible wrapper that forwards legacy `phodex up` usage to `rimcodex up`.
 // Layer: CLI binary
 // Exports: none
-// Depends on: ./remodex
+// Depends on: ./rimcodex
 
-const { main } = require("./remodex");
+const { main } = require("./rimcodex");
 
 void main();
