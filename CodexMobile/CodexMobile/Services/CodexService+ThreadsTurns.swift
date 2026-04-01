@@ -7,10 +7,6 @@
 import Foundation
 
 extension CodexService {
-    // Keeps sidebar/project loading focused on recent conversations without hiding
-    // other active project groups when the latest chats all belong to one repo.
-    var recentThreadListLimit: Int { 40 }
-
     // Encodes manual approval replies using the app-server decision object shape.
     func approvalDecisionResult(_ decision: String) -> JSONValue {
         .object(["decision": .string(decision)])
@@ -20,12 +16,11 @@ extension CodexService {
         isLoadingThreads = true
         defer { isLoadingThreads = false }
 
-        let effectiveLimit = limit ?? recentThreadListLimit
-        let activeThreads = try await fetchServerThreads(limit: effectiveLimit)
+        let activeThreads = try await fetchServerThreads(limit: limit)
 
         var archivedThreads: [CodexThread] = []
         do {
-            archivedThreads = try await fetchServerThreads(limit: effectiveLimit, archived: true)
+            archivedThreads = try await fetchServerThreads(limit: limit, archived: true)
         } catch {
             debugSyncLog("thread/list archived fetch failed (non-fatal): \(error.localizedDescription)")
         }
@@ -33,7 +28,7 @@ extension CodexService {
         reconcileLocalThreadsWithServer(activeThreads, serverArchivedThreads: archivedThreads)
 
         if activeThreadId == nil {
-            activeThreadId = firstLiveThreadID()
+            activeThreadId = preferredVisibleThreadID()
         }
     }
 
@@ -513,7 +508,7 @@ extension CodexService {
                 params["archived"] = .bool(true)
             }
 
-            let response = try await sendRequest(method: "thread/list", params: .object(params))
+            let response = try await sendBridgeCompatibleRequest(method: "thread/list", params: .object(params))
 
             guard let resultObject = response.result?.objectValue else {
                 throw CodexServiceError.invalidResponse("thread/list response missing payload")
@@ -668,7 +663,7 @@ extension CodexService {
         ])
 
         do {
-            _ = try await sendRequest(method: "thread/read", params: params)
+            _ = try await sendBridgeCompatibleRequest(method: "thread/read", params: params)
             return false
         } catch {
             return shouldTreatAsThreadNotFound(error)
@@ -878,7 +873,7 @@ extension CodexService {
             }
 
             do {
-                let response = try await sendRequest(method: "turn/steer", params: .object(params))
+                let response = try await sendBridgeCompatibleRequest(method: "turn/steer", params: .object(params))
                 let resolvedTurnID = extractTurnID(from: response.result) ?? currentExpectedTurnID
                 markMessageDeliveryState(
                     threadId: normalizedThreadID,
@@ -1300,7 +1295,7 @@ extension CodexService {
         if let threadId {
             params[useSnakeCaseParams ? "thread_id" : "threadId"] = .string(threadId)
         }
-        _ = try await sendRequest(method: "turn/interrupt", params: .object(params))
+        _ = try await sendBridgeCompatibleRequest(method: "turn/interrupt", params: .object(params))
     }
 
     // Normalizes ids coming from UI/runtime state before RPC usage.
@@ -1400,7 +1395,7 @@ extension CodexService {
     ) {
         let response: RPCMessage
         do {
-            response = try await sendRequest(
+            response = try await sendBridgeCompatibleRequest(
                 method: "thread/read",
                 params: .object([
                     "threadId": .string(threadId),
@@ -1412,7 +1407,7 @@ extension CodexService {
                 throw error
             }
 
-            response = try await sendRequest(
+            response = try await sendBridgeCompatibleRequest(
                 method: "thread/read",
                 params: .object([
                     "thread_id": .string(threadId),

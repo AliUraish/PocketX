@@ -40,8 +40,71 @@ private struct CodexManualWebSocketEndpoint {
     let scheme: String
 }
 
-private func codexLogPairingTransport(_ message: String) {
-    print("[PAIRING] \(message)")
+private enum CodexPairingTransportLogger {
+    nonisolated static func log(_ message: String) {
+        print("[PAIRING] \(message)")
+    }
+}
+
+private final class CodexConnectionReadyWaitState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var didFinish = false
+    private var timeoutTask: Task<Void, Never>?
+    private var lastObservedStateDescription = "setup"
+    private var lastWaitingErrorDescription: String?
+
+    func installTimeoutTask(_ task: Task<Void, Never>) {
+        lock.lock()
+        timeoutTask = task
+        lock.unlock()
+    }
+
+    func recordObservedState(_ description: String) {
+        lock.lock()
+        lastObservedStateDescription = description
+        lock.unlock()
+    }
+
+    func recordWaitingError(_ description: String) {
+        lock.lock()
+        lastWaitingErrorDescription = description
+        lock.unlock()
+    }
+
+    func timeoutLogMessage(logLabel: String) -> String {
+        lock.lock()
+        let lastObservedStateDescription = self.lastObservedStateDescription
+        let lastWaitingErrorDescription = self.lastWaitingErrorDescription
+        lock.unlock()
+
+        var timeoutLog = "\(logLabel) timed out while state=\(lastObservedStateDescription)"
+        if let lastWaitingErrorDescription {
+            timeoutLog += " waitingError=\(lastWaitingErrorDescription)"
+        }
+        return timeoutLog
+    }
+
+    func finish(
+        _ result: Result<Void, Error>,
+        continuation: CheckedContinuation<Void, Error>,
+        connection: NWConnection
+    ) {
+        let timeoutTask: Task<Void, Never>?
+
+        lock.lock()
+        guard !didFinish else {
+            lock.unlock()
+            return
+        }
+        didFinish = true
+        timeoutTask = self.timeoutTask
+        self.timeoutTask = nil
+        lock.unlock()
+
+        timeoutTask?.cancel()
+        continuation.resume(with: result)
+        connection.stateUpdateHandler = { _ in }
+    }
 }
 
 extension CodexService {
@@ -193,8 +256,16 @@ extension CodexService {
             guard let self else { return }
 
             // Pre-decode wire text off the main actor so JSONDecoder doesn't block UI frames.
-            let wireText: String? = data.flatMap { String(data: $0, encoding: .utf8) }
-            let preDecoded = wireText.map { WireMessagePreDecoder.classify($0) }
+            let decodedPayload: (text: String, classification: WireMessagePreDecoder.Classification)? = {
+                guard let text = data.flatMap({ String(data: $0, encoding: .utf8) }) else {
+                    return nil
+                }
+                return (text, WireMessagePreDecoder.classify(text))
+            }()
+            let relayMetadata = context?.protocolMetadata(definition: NWProtocolWebSocket.definition)
+                as? NWProtocolWebSocket.Metadata
+            let relayCloseCode = relayMetadata?.closeCode
+            let didReceiveCloseFrame = relayMetadata?.opcode == .close
 
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -205,21 +276,20 @@ extension CodexService {
                     return
                 }
 
-                if let metadata = context?.protocolMetadata(definition: NWProtocolWebSocket.definition) as? NWProtocolWebSocket.Metadata,
-                   metadata.opcode == .close {
+                if didReceiveCloseFrame {
                     self.handleReceiveError(
                         CodexServiceError.disconnected,
-                        relayCloseCode: metadata.closeCode
+                        relayCloseCode: relayCloseCode
                     )
                     return
                 }
 
-                if let text = wireText, let decoded = preDecoded {
-                    if decoded.isSecure {
+                if let decodedPayload {
+                    if decodedPayload.classification.isSecure {
                         // Secure control or encrypted envelope — must stay on MainActor.
-                        self.processIncomingWireText(text)
-                    } else if let rpcResult = decoded.rpcResult {
-                        self.handleDecodedRPCResult(rpcResult, rawText: text)
+                        self.processIncomingWireText(decodedPayload.text)
+                    } else if let rpcResult = decodedPayload.classification.rpcResult {
+                        self.handleDecodedRPCResult(rpcResult, rawText: decodedPayload.text)
                     }
                 }
 
@@ -262,21 +332,26 @@ extension CodexService {
             guard let self else { return }
 
             // Extract text and pre-decode off the main actor.
-            var wireText: String?
-            var preDecoded: WireMessagePreDecoder.Classification?
-            if case .success(let message) = result {
+            let decodedPayload: (text: String, classification: WireMessagePreDecoder.Classification)? = {
+                guard case .success(let message) = result else {
+                    return nil
+                }
+
+                let text: String?
                 switch message {
-                case .string(let text):
-                    wireText = text
+                case .string(let value):
+                    text = value
                 case .data(let data):
-                    wireText = String(data: data, encoding: .utf8)
+                    text = String(data: data, encoding: .utf8)
                 @unknown default:
-                    break
+                    text = nil
                 }
-                if let text = wireText {
-                    preDecoded = WireMessagePreDecoder.classify(text)
+
+                guard let text else {
+                    return nil
                 }
-            }
+                return (text, WireMessagePreDecoder.classify(text))
+            }()
 
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -289,11 +364,11 @@ extension CodexService {
                         relayCloseCode: self.relayCloseCode(for: task.closeCode)
                     )
                 case .success:
-                    if let text = wireText, let decoded = preDecoded {
-                        if decoded.isSecure {
-                            self.processIncomingWireText(text)
-                        } else if let rpcResult = decoded.rpcResult {
-                            self.handleDecodedRPCResult(rpcResult, rawText: text)
+                    if let decodedPayload {
+                        if decodedPayload.classification.isSecure {
+                            self.processIncomingWireText(decodedPayload.text)
+                        } else if let rpcResult = decodedPayload.classification.rpcResult {
+                            self.handleDecodedRPCResult(rpcResult, rawText: decodedPayload.text)
                         }
                     }
 
@@ -310,7 +385,7 @@ extension CodexService {
         }
 
         let preference = relayTransportPreference(for: url)
-        codexLogPairingTransport("using \(preference.logLabel) for \(url.host ?? "unknown-host")")
+        CodexPairingTransportLogger.log("using \(preference.logLabel) for \(url.host ?? "unknown-host")")
 
         switch preference {
         case .manualTCP:
@@ -339,11 +414,11 @@ extension CodexService {
             timeoutMessage: "Connection timed out after 12s while opening the direct relay socket."
         )
 
-        codexLogPairingTransport("opening manual TCP websocket")
+        CodexPairingTransportLogger.log("opening manual TCP websocket")
         try await waitUntilManualConnectionReady(connection, configuration: waitConfiguration)
         do {
             try await performManualWebSocketHandshake(on: connection, url: url, token: token, role: role)
-            codexLogPairingTransport("manual TCP websocket connected")
+            CodexPairingTransportLogger.log("manual TCP websocket connected")
         } catch {
             connection.cancel()
             throw error
@@ -397,7 +472,7 @@ extension CodexService {
         let parameters = NWParameters(tls: tlsOptions, tcp: NWProtocolTCP.Options())
         parameters.defaultProtocolStack.applicationProtocols.insert(webSocketOptions, at: 0)
 
-        codexLogPairingTransport("opening NWConnection websocket")
+        CodexPairingTransportLogger.log("opening NWConnection websocket")
         let connection = NWConnection(to: .url(url), using: parameters)
         let waitConfiguration = CodexConnectionReadyWaitConfiguration(
             logLabel: "NWConnection websocket",
@@ -455,7 +530,7 @@ extension CodexService {
         task.maximumMessageSize = codexWebSocketMaximumMessageSizeBytes
         let connectionTimeoutNanoseconds: UInt64 = 12_000_000_000
 
-        codexLogPairingTransport("opening URLSessionWebSocketTask")
+        CodexPairingTransportLogger.log("opening URLSessionWebSocketTask")
         task.resume()
         webSocketSessionDelegate = delegate
 
@@ -471,9 +546,9 @@ extension CodexService {
 
         do {
             try await delegate.waitForOpen()
-            codexLogPairingTransport("URLSessionWebSocketTask connected")
+            CodexPairingTransportLogger.log("URLSessionWebSocketTask connected")
         } catch {
-            codexLogPairingTransport("URLSessionWebSocketTask failed: \(urlSessionWebSocketDebugDescription(for: error))")
+            CodexPairingTransportLogger.log("URLSessionWebSocketTask failed: \(urlSessionWebSocketDebugDescription(for: error))")
             task.cancel(with: .goingAway, reason: nil)
             session.invalidateAndCancel()
             webSocketSessionDelegate = nil
@@ -554,54 +629,36 @@ extension CodexService {
         configuration: CodexConnectionReadyWaitConfiguration
     ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let lock = NSLock()
-            var didFinish = false
-            var timeoutTask: Task<Void, Never>?
-            var lastObservedStateDescription = "setup"
-            var lastWaitingErrorDescription: String?
-
-            func finish(_ result: Result<Void, Error>) {
-                lock.lock()
-                defer { lock.unlock() }
-                guard !didFinish else { return }
-                didFinish = true
-                timeoutTask?.cancel()
-                continuation.resume(with: result)
-                // Ignore future state transitions after first completion.
-                connection.stateUpdateHandler = { _ in }
-            }
+            let waitState = CodexConnectionReadyWaitState()
 
             connection.stateUpdateHandler = { state in
-                lastObservedStateDescription = String(describing: state)
-                codexLogPairingTransport("\(configuration.logLabel) state: \(state)")
+                waitState.recordObservedState(String(describing: state))
+                CodexPairingTransportLogger.log("\(configuration.logLabel) state: \(state)")
                 switch state {
                 case .ready:
-                    finish(.success(()))
+                    waitState.finish(.success(()), continuation: continuation, connection: connection)
                 case .waiting(let error):
-                    lastWaitingErrorDescription = String(describing: error)
+                    waitState.recordWaitingError(String(describing: error))
                 case .failed(let error):
-                    codexLogPairingTransport("\(configuration.logLabel) failed: \(error)")
-                    finish(.failure(error))
+                    CodexPairingTransportLogger.log("\(configuration.logLabel) failed: \(error)")
+                    waitState.finish(.failure(error), continuation: continuation, connection: connection)
                 case .cancelled:
-                    finish(.failure(CodexServiceError.disconnected))
+                    waitState.finish(.failure(CodexServiceError.disconnected), continuation: continuation, connection: connection)
                 default:
                     break
                 }
             }
 
-            connection.start(queue: webSocketQueue)
-            timeoutTask = Task { [weak connection] in
+            let timeoutTask = Task { [weak connection] in
                 try? await Task.sleep(nanoseconds: configuration.timeoutNanoseconds)
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, let connection else { return }
                 let timeoutError = CodexServiceError.invalidInput(configuration.timeoutMessage)
-                var timeoutLog = "\(configuration.logLabel) timed out while state=\(lastObservedStateDescription)"
-                if let lastWaitingErrorDescription {
-                    timeoutLog += " waitingError=\(lastWaitingErrorDescription)"
-                }
-                codexLogPairingTransport(timeoutLog)
-                finish(.failure(timeoutError))
-                connection?.cancel()
+                CodexPairingTransportLogger.log(waitState.timeoutLogMessage(logLabel: configuration.logLabel))
+                waitState.finish(.failure(timeoutError), continuation: continuation, connection: connection)
+                connection.cancel()
             }
+            waitState.installTimeoutTask(timeoutTask)
+            connection.start(queue: webSocketQueue)
         }
     }
 
@@ -630,7 +687,7 @@ extension CodexService {
         }
         requestLines.append(contentsOf: ["", ""])
 
-        codexLogPairingTransport("sending manual TCP websocket upgrade request")
+        CodexPairingTransportLogger.log("sending manual TCP websocket upgrade request")
         try await sendRaw(Data(requestLines.joined(separator: "\r\n").utf8), on: connection)
 
         var headerBytes = Data()
@@ -639,7 +696,7 @@ extension CodexService {
                 let headerData = Data(headerBytes[..<range.upperBound])
                 manualWebSocketReadBuffer = Data(headerBytes[range.upperBound...])
                 try validateManualWebSocketHandshakeResponse(headerData: headerData, key: key)
-                codexLogPairingTransport("manual TCP websocket upgrade accepted")
+                CodexPairingTransportLogger.log("manual TCP websocket upgrade accepted")
                 return
             }
             guard let chunk = try await receiveRaw(on: connection) else {
