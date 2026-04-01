@@ -43,14 +43,21 @@ private struct CachedSubscriptionState: Codable, Equatable {
     let managementURLString: String?
 }
 
+private final class SubscriptionCustomerInfoObserverTaskBox {
+    var task: Task<Void, Never>?
+
+    deinit {
+        task?.cancel()
+    }
+}
+
 @MainActor
 @Observable
 final class SubscriptionService {
     private static let cachedStateDefaultsKey = "codex.subscription.cachedState"
 
     private let defaults: UserDefaults
-    // Keep the task handle nonisolated so `deinit` can cancel it under Swift 6 isolation rules.
-    nonisolated(unsafe) private var customerInfoUpdatesTask: Task<Void, Never>?
+    private let customerInfoObserverTaskBox = SubscriptionCustomerInfoObserverTaskBox()
     private var isBootstrapping = false
     private var hasCachedOptimisticAccess = false
 
@@ -71,10 +78,6 @@ final class SubscriptionService {
         self.defaults = defaults
         restoreCachedStateIfAvailable()
         startCustomerInfoObserverIfConfigured()
-    }
-
-    deinit {
-        customerInfoUpdatesTask?.cancel()
     }
 
     // Bootstraps subscription state once at launch or from the recovery retry action.
@@ -206,17 +209,17 @@ final class SubscriptionService {
 
 private extension SubscriptionService {
     func startCustomerInfoObserverIfConfigured() {
-        guard customerInfoUpdatesTask == nil, Purchases.isConfigured else {
+        guard customerInfoObserverTaskBox.task == nil, Purchases.isConfigured else {
             return
         }
 
-        customerInfoUpdatesTask = Task { [weak self] in
+        customerInfoObserverTaskBox.task = Task { @MainActor [weak self] in
             for await info in Purchases.shared.customerInfoStream {
                 guard let self else {
                     break
                 }
 
-                await self.handleCustomerInfoStreamUpdate(info)
+                self.handleCustomerInfoStreamUpdate(info)
             }
         }
     }
