@@ -325,7 +325,7 @@ extension CodexService {
 
         // Rehydrate in-flight turn metadata after reconnect/background transitions.
         // Without this refresh, stop-state can disappear until a new live event arrives.
-        await refreshInFlightTurnState(threadId: threadId)
+        _ = await refreshInFlightTurnState(threadId: threadId)
         guard !Task.isCancelled else {
             return false
         }
@@ -420,7 +420,7 @@ extension CodexService {
 
         var response: RPCMessage
         do {
-            response = try await sendRequest(method: "thread/read", params: paramsWithTurns)
+            response = try await sendBridgeCompatibleRequest(method: "thread/read", params: paramsWithTurns)
         } catch let error as CodexServiceError {
             if case .rpcError(let rpcError) = error, rpcError.code == -32600 {
                 // Sidebar/timeline metadata fetches should keep retrying while the child thread
@@ -544,7 +544,7 @@ extension CodexService {
                 messagesByThread[threadId]?[existingIndex].turnId = turnId
                 didMutate = true
             }
-            if messagesByThread[threadId]?[existingIndex].fileMentions.isEmpty, !fileMentions.isEmpty {
+            if messagesByThread[threadId]?[existingIndex].fileMentions.isEmpty == true, !fileMentions.isEmpty {
                 messagesByThread[threadId]?[existingIndex].fileMentions = fileMentions
                 didMutate = true
             }
@@ -1972,7 +1972,8 @@ extension CodexService {
             existingText: currentText,
             incomingDelta: delta
         )
-        let didResolveItemId = messagesByThread[threadId]?[messageIndex].itemId == nil && itemId != nil
+        let existingItemId = messagesByThread[threadId]?[messageIndex].itemId
+        let didResolveItemId = existingItemId == nil && itemId != nil
 
         guard nextText != currentText
                 || !(messagesByThread[threadId]?[messageIndex].isStreaming ?? false)
@@ -2315,8 +2316,9 @@ extension CodexService {
             let snapshot = self.messagesByThread
             self.messagePersistenceDebounceTask = nil
 
-            Task.detached { [messagePersistence] in
-                messagePersistence.save(snapshot)
+            let persistence = self.messagePersistence
+            Task.detached {
+                persistence.save(snapshot)
             }
         }
     }

@@ -110,6 +110,11 @@ extension CodexService {
 
     // Handles server-initiated RPC requests like approval prompts.
     func handleServerRequest(method: String, requestID: JSONValue, params: JSONValue?) {
+        if method == "bridge/request",
+           handleBridgeRequestEnvelope(requestID: requestID, paramsObject: params?.objectValue) {
+            return
+        }
+
         if method == "item/tool/requestUserInput" {
             handleStructuredUserInputRequest(
                 requestID: requestID,
@@ -170,7 +175,17 @@ extension CodexService {
     func handleNotification(method: String, params: JSONValue?) {
         let paramsObject = params?.objectValue
 
+        if method == "bridge/event",
+           handleBridgeEventEnvelope(paramsObject) {
+            return
+        }
+
         switch method {
+        case "bridge/healthChanged":
+            if let paramsObject {
+                applyBridgeHealthSnapshot(from: paramsObject)
+            }
+
         case "thread/started":
             handleThreadStarted(paramsObject)
 
