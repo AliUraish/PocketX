@@ -324,7 +324,7 @@ final class CodexService {
     var threadRuntimeOverridesByThreadID: [String: CodexThreadRuntimeOverride] = [:]
     var selectedAccessMode: CodexAccessMode = .onRequest
     // Bridge-owned ChatGPT auth snapshot used by Settings and voice gating.
-    var gptAccountSnapshot: CodexGPTAccountSnapshot = codexGPTAccountInitialSnapshot() {
+    var gptAccountSnapshot: CodexGPTAccountSnapshot = .initialSnapshot() {
         didSet {
             persistGPTAccountSnapshot(gptAccountSnapshot)
         }
@@ -344,6 +344,10 @@ final class CodexService {
     var supportsBridgeVoiceAuth = true
     // Runtime compatibility flag for native `thread/fork` conversation branching.
     var supportsThreadFork = true
+    // Bridge protocol negotiation state for the bridge-owned mobile API facade.
+    var bridgeProtocolAvailability: CodexBridgeProtocolAvailability = .unknown
+    // Latest explicit bridge health snapshot, when supported by the connected Mac bridge.
+    var bridgeHealthSnapshot: CodexBridgeHealthSnapshot?
     // Seeds brand-new chats with one-shot composer actions like code review.
     var pendingComposerActionByThreadID: [String: CodexPendingThreadComposerAction] = [:]
     // In-memory identity directory for subagents, keyed by thread id and agent id.
@@ -493,6 +497,7 @@ final class CodexService {
     static let locallyArchivedThreadIDsKey = "codex.locallyArchivedThreadIDs"
     static let forkedThreadOriginsDefaultsKey = "codex.forkedThreadOrigins"
     static let renamedThreadNamesDefaultsKey = "codex.renamedThreadNames"
+    static let lastOpenedThreadIDDefaultsKey = "codex.lastOpenedThreadID"
     static let notificationsPromptedDefaultsKey = "codex.notifications.prompted"
 
     init(
@@ -500,13 +505,13 @@ final class CodexService {
         decoder: JSONDecoder = JSONDecoder(),
         defaults: UserDefaults = .standard,
         userNotificationCenter: CodexUserNotificationCentering = UNUserNotificationCenter.current(),
-        remoteNotificationRegistrar: CodexRemoteNotificationRegistering = CodexApplicationRemoteNotificationRegistrar()
+        remoteNotificationRegistrar: CodexRemoteNotificationRegistering? = nil
     ) {
         self.encoder = encoder
         self.decoder = decoder
         self.defaults = defaults
         self.userNotificationCenter = userNotificationCenter
-        self.remoteNotificationRegistrar = remoteNotificationRegistrar
+        self.remoteNotificationRegistrar = remoteNotificationRegistrar ?? CodexApplicationRemoteNotificationRegistrar()
         self.phoneIdentityState = codexPhoneIdentityStateFromSecureStore()
         self.trustedMacRegistry = codexTrustedMacRegistryFromSecureStore()
         self.lastTrustedMacDeviceId = SecureStore.readString(for: CodexSecureKeys.lastTrustedMacDeviceId)
@@ -588,7 +593,7 @@ final class CodexService {
         if let persistedGPTAccountSnapshot = loadPersistedGPTAccountSnapshot() {
             self.gptAccountSnapshot = persistedGPTAccountSnapshot
         } else {
-            self.gptAccountSnapshot = codexGPTAccountInitialSnapshot()
+            self.gptAccountSnapshot = .initialSnapshot()
         }
 
         if let pendingLogin = gptPendingLoginState,
@@ -636,7 +641,7 @@ final class CodexService {
         rebuildThreadLookupCaches()
     }
 
-    // Remembers whether we can offer reconnect without forcing a fresh QR scan.
+    // Remembers whether we can offer reconnect without forcing a fresh pairing.
     var hasSavedRelaySession: Bool {
         normalizedRelaySessionId != nil && normalizedRelayURL != nil
     }
