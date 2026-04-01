@@ -377,6 +377,8 @@ final class CodexService {
     var bridgeInstalledVersion: String?
     // Mirrors the latest published bridge package version, when the bridge can resolve it.
     var latestBridgePackageVersion: String?
+    // Best-effort Codex runtime version reported by the Mac bridge compatibility probe.
+    var bridgeCodexVersion: String?
     // Fresh QR scans must use bootstrap once, even if this Mac was already trusted before.
     var shouldForceQRBootstrapOnNextHandshake = false
     // Stops infinite trusted-reconnect loops by escalating back to QR after repeated handshake failures.
