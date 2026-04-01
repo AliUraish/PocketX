@@ -7,7 +7,10 @@
 import Foundation
 
 enum AppEnvironment {
-    private static let defaultRelayURLInfoPlistKey = "PHODEX_DEFAULT_RELAY_URL"
+    private static let defaultRelayURLInfoPlistKeys = ["RIMCODEX_DEFAULT_RELAY_URL", "PHODEX_DEFAULT_RELAY_URL"]
+    private static let sourceRepositoryURLInfoPlistKey = "RIMCODEX_SOURCE_REPOSITORY_URL"
+    private static let privacyPolicyURLInfoPlistKey = "RIMCODEX_PRIVACY_POLICY_URL"
+    private static let termsOfUseURLInfoPlistKey = "RIMCODEX_TERMS_OF_USE_URL"
     private static let revenueCatPublicAPIKeyInfoPlistKey = "REVENUECAT_PUBLIC_API_KEY"
     private static let revenueCatEntitlementNameInfoPlistKey = "REVENUECAT_ENTITLEMENT_NAME"
     private static let revenueCatDefaultOfferingIDInfoPlistKey = "REVENUECAT_DEFAULT_OFFERING_ID"
@@ -17,8 +20,10 @@ enum AppEnvironment {
     static let defaultRelayURLString = ""
 
     static var relayBaseURL: String {
-        if let infoURL = resolvedString(forInfoPlistKey: defaultRelayURLInfoPlistKey) {
-            return infoURL
+        for key in defaultRelayURLInfoPlistKeys {
+            if let infoURL = resolvedString(forInfoPlistKey: key) {
+                return infoURL
+            }
         }
         return defaultRelayURLString
     }
@@ -38,14 +43,26 @@ enum AppEnvironment {
         resolvedString(forInfoPlistKey: revenueCatDefaultOfferingIDInfoPlistKey) ?? "default"
     }
 
-    // Legal links shown in the paywall footer and Settings.
-    // Keep these pointed at a public source-of-truth until the website serves dedicated legal routes.
-    static let privacyPolicyURL = URL(
-        string: "https://github.com/Emanuele-web04/remodex/blob/main/Legal/PRIVACY_POLICY.md"
-    )!
-    static let termsOfUseURL = URL(
-        string: "https://github.com/Emanuele-web04/remodex/blob/main/Legal/TERMS_OF_USE.md"
-    )!
+    static var sourceRepositoryURL: URL? {
+        guard let rawValue = resolvedString(forInfoPlistKey: sourceRepositoryURLInfoPlistKey) else {
+            return nil
+        }
+        return URL(string: rawValue)
+    }
+
+    static var privacyPolicyURL: URL? {
+        guard let rawValue = resolvedString(forInfoPlistKey: privacyPolicyURLInfoPlistKey) else {
+            return nil
+        }
+        return URL(string: rawValue)
+    }
+
+    static var termsOfUseURL: URL? {
+        guard let rawValue = resolvedString(forInfoPlistKey: termsOfUseURLInfoPlistKey) else {
+            return nil
+        }
+        return URL(string: rawValue)
+    }
 }
 
 private extension AppEnvironment {

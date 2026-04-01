@@ -1,5 +1,5 @@
 // FILE: CodexSecureTransportModels.swift
-// Purpose: Defines the wire payloads, device trust records, and crypto helpers for Remodex E2EE.
+// Purpose: Defines the wire payloads, device trust records, and crypto helpers for rimcodex E2EE.
 // Layer: Service support
 // Exports: Pairing/session models plus transcript, nonce, and key utility helpers
 // Depends on: Foundation, CryptoKit
@@ -8,15 +8,16 @@ import CryptoKit
 import Foundation
 
 let codexSecureProtocolVersion = 1
-let codexPairingQRVersion = 2
-let codexSecureHandshakeTag = "remodex-e2ee-v1"
+let codexPairingProtocolVersion = 2
+let codexPairingQRVersion = codexPairingProtocolVersion
+let codexSecureHandshakeTag = "rimcodex-e2ee-v1"
 let codexSecureHandshakeLabel = "client-auth"
 let codexSecureClockSkewToleranceSeconds: TimeInterval = 60
-let codexTrustedSessionResolveTag = "remodex-trusted-session-resolve-v1"
+let codexTrustedSessionResolveTag = "rimcodex-trusted-session-resolve-v1"
 let codexTrustedSessionResolveClockSkewToleranceSeconds: TimeInterval = 90
 
 enum CodexSecureHandshakeMode: String, Codable, Sendable {
-    case qrBootstrap = "qr_bootstrap"
+    case pairingBootstrap = "pairing_bootstrap"
     case trustedReconnect = "trusted_reconnect"
 }
 
@@ -31,13 +32,25 @@ enum CodexSecureConnectionState: Equatable, Sendable {
     case updateRequired
 }
 
-struct CodexPairingQRPayload: Codable, Sendable {
+struct CodexPairingBootstrapPayload: Codable, Sendable {
     let v: Int
     let relay: String
     let sessionId: String
     let macDeviceId: String
     let macIdentityPublicKey: String
     let expiresAt: Int64
+}
+
+typealias CodexPairingQRPayload = CodexPairingBootstrapPayload
+
+struct CodexPairingCodeClaimRequest: Codable, Sendable {
+    let pairingCode: String
+    let deviceName: String?
+}
+
+struct CodexPairingCodeClaimResponse: Codable, Sendable {
+    let ok: Bool
+    let pairing: CodexPairingBootstrapPayload
 }
 
 struct CodexPhoneIdentityState: Codable, Sendable {
@@ -192,7 +205,7 @@ enum CodexSecureTransportError: LocalizedError {
              .timedOut(let message):
             return message
         case .decryptFailed:
-            return "Unable to decrypt the secure Remodex payload."
+            return "Unable to decrypt the secure rimcodex payload."
         }
     }
 }
@@ -214,6 +227,34 @@ enum CodexTrustedSessionResolveError: LocalizedError {
         case .macOffline(let message),
              .rePairRequired(let message),
              .invalidResponse(let message),
+             .network(let message):
+            return message
+        }
+    }
+}
+
+enum CodexPairingCodeClaimError: LocalizedError {
+    case missingRelayURL
+    case invalidRelayURL
+    case invalidCode
+    case invalidResponse(String)
+    case expired(String)
+    case unavailable(String)
+    case alreadyUsed(String)
+    case network(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .missingRelayURL:
+            return "Enter the relay URL for your Mac bridge before pairing."
+        case .invalidRelayURL:
+            return "The relay URL is invalid."
+        case .invalidCode:
+            return "Enter a valid pairing code."
+        case .invalidResponse(let message),
+             .expired(let message),
+             .unavailable(let message),
+             .alreadyUsed(let message),
              .network(let message):
             return message
         }
