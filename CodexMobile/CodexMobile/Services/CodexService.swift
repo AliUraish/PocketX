@@ -186,6 +186,8 @@ enum CodexNotificationPayloadKeys {
     static let turnId = "turnId"
     static let result = "result"
     static let requestId = "requestId"
+    static let eventType = "eventType"
+    static let bridgeHealthState = "bridgeHealthState"
 }
 
 // Tracks the real terminal outcome of a run, including user interruption.
@@ -455,6 +457,8 @@ final class CodexService {
     var hasConfiguredNotifications = false
     var runCompletionNotificationDedupedAt: [String: Date] = [:]
     var structuredUserInputNotificationDedupedAt: [String: Date] = [:]
+    var approvalNotificationDedupedAt: [String: Date] = [:]
+    var bridgeEventNotificationDedupedAt: [String: Date] = [:]
     var notificationCenterDelegateProxy: CodexNotificationCenterDelegateProxy?
     var notificationObserverTokens: [NSObjectProtocol] = []
     var remoteNotificationDeviceToken: String?
