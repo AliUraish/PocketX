@@ -18,6 +18,7 @@ struct CodexApprovalRequest: Identifiable, Sendable {
     let reason: String?
     let threadId: String?
     let turnId: String?
+    let requestedAt: Date?
     let params: JSONValue?
 }
 
@@ -304,7 +305,7 @@ final class CodexService {
     var latestTurnTerminalStateByThread: [String: CodexTurnTerminalState] = [:]
     // Preserves terminal outcome per turn so completed/stopped blocks stay distinguishable.
     var terminalStateByTurnID: [String: CodexTurnTerminalState] = [:]
-    var pendingApproval: CodexApprovalRequest?
+    var pendingApprovalRequests: [CodexApprovalRequest] = []
     var lastRawMessage: String?
     var lastErrorMessage: String?
     var connectionRecoveryState: CodexConnectionRecoveryState = .idle
