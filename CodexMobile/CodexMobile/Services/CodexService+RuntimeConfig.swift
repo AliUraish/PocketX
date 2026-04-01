@@ -29,7 +29,7 @@ extension CodexService {
             params["approvalPolicy"] = .string(policy)
 
             do {
-                return try await sendRequest(method: method, params: .object(params))
+                return try await sendBridgeCompatibleRequest(method: method, params: .object(params))
             } catch {
                 lastError = error
                 let hasMorePolicies = index < (policies.count - 1)
@@ -49,7 +49,7 @@ extension CodexService {
         defer { isLoadingModels = false }
 
         do {
-            let response = try await sendRequest(
+            let response = try await sendBridgeCompatibleRequest(
                 method: "model/list",
                 params: .object([
                     "cursor": .null,
