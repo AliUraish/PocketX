@@ -11,7 +11,7 @@ const { watchThreadRollout } = require("./rollout-watch");
 const { readBridgeConfig } = require("./codex-desktop-refresher");
 const {
   getMacOSBridgeServiceStatus,
-  printMacOSBridgePairingQr,
+  printMacOSBridgePairingCode,
   printMacOSBridgeServiceStatus,
   resetMacOSBridgePairing,
   runMacOSBridgeService,
@@ -21,7 +21,8 @@ const {
 
 module.exports = {
   getMacOSBridgeServiceStatus,
-  printMacOSBridgePairingQr,
+  printMacOSBridgePairingCode,
+  printMacOSBridgePairingQr: printMacOSBridgePairingCode,
   printMacOSBridgeServiceStatus,
   readBridgeConfig,
   resetMacOSBridgePairing,

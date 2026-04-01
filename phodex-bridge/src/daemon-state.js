@@ -8,7 +8,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const DEFAULT_STATE_DIR_NAME = ".remodex";
+const DEFAULT_STATE_DIR_NAME = ".rimcodex";
 const DAEMON_CONFIG_FILE = "daemon-config.json";
 const PAIRING_SESSION_FILE = "pairing-session.json";
 const BRIDGE_STATUS_FILE = "bridge-status.json";
@@ -16,9 +16,10 @@ const LOGS_DIR = "logs";
 const BRIDGE_STDOUT_LOG_FILE = "bridge.stdout.log";
 const BRIDGE_STDERR_LOG_FILE = "bridge.stderr.log";
 
-// Reuses the existing Remodex state root so daemon mode keeps the same local-first storage model.
+// Reuses the existing rimcodex state root so daemon mode keeps the same local-first storage model.
 function resolveRemodexStateDir({ env = process.env, osImpl = os } = {}) {
-  return normalizeNonEmptyString(env.REMODEX_DEVICE_STATE_DIR)
+  return normalizeNonEmptyString(env.RIMCODEX_DEVICE_STATE_DIR)
+    || normalizeNonEmptyString(env.REMODEX_DEVICE_STATE_DIR)
     || path.join(osImpl.homedir(), DEFAULT_STATE_DIR_NAME);
 }
 
@@ -54,23 +55,28 @@ function readDaemonConfig(options = {}) {
   return readJsonFile(resolveDaemonConfigPath(options), options);
 }
 
-// Persists the pairing payload so foreground CLI commands can render the QR locally.
-function writePairingSession(pairingPayload, { now = () => Date.now(), ...options } = {}) {
-  writeJsonFile(resolvePairingSessionPath(options), {
+// Persists the pairing session so foreground CLI commands can render the latest pairing code locally.
+function writePairingSession(pairingSession, { now = () => Date.now(), ...options } = {}) {
+  const normalizedPairingSession = normalizeStoredPairingSession({
     createdAt: new Date(now()).toISOString(),
-    pairingPayload,
-  }, options);
+    ...(normalizePairingSessionInput(pairingSession)),
+  });
+  if (!normalizedPairingSession) {
+    return;
+  }
+
+  writeJsonFile(resolvePairingSessionPath(options), normalizedPairingSession, options);
 }
 
 function readPairingSession(options = {}) {
-  return readJsonFile(resolvePairingSessionPath(options), options);
+  return normalizeStoredPairingSession(readJsonFile(resolvePairingSessionPath(options), options));
 }
 
 function clearPairingSession({ fsImpl = fs, ...options } = {}) {
   removeFile(resolvePairingSessionPath(options), fsImpl);
 }
 
-// Captures the last known service heartbeat so `remodex status` does not depend on launchctl output alone.
+// Captures the last known service heartbeat so `rimcodex status` does not depend on launchctl output alone.
 function writeBridgeStatus(status, { now = () => Date.now(), ...options } = {}) {
   writeJsonFile(resolveBridgeStatusPath(options), {
     ...status,
@@ -92,6 +98,109 @@ function ensureRemodexStateDir({ fsImpl = fs, ...options } = {}) {
 
 function ensureRemodexLogsDir({ fsImpl = fs, ...options } = {}) {
   fsImpl.mkdirSync(resolveBridgeLogsDir(options), { recursive: true });
+}
+
+function normalizePairingSessionInput(value) {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(value, "pairingCode")
+    || Object.prototype.hasOwnProperty.call(value, "pairingSessionId")
+    || Object.prototype.hasOwnProperty.call(value, "expiresAt")
+    || Object.prototype.hasOwnProperty.call(value, "pairingPayload")
+  ) {
+    return value;
+  }
+
+  return {
+    pairingPayload: value,
+  };
+}
+
+function normalizeStoredPairingSession(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const nestedPairingSession = value.pairingPayload
+    && typeof value.pairingPayload === "object"
+    && (
+      Object.prototype.hasOwnProperty.call(value.pairingPayload, "pairingCode")
+      || Object.prototype.hasOwnProperty.call(value.pairingPayload, "pairingSessionId")
+      || Object.prototype.hasOwnProperty.call(value.pairingPayload, "expiresAt")
+      || Object.prototype.hasOwnProperty.call(value.pairingPayload, "pairingPayload")
+    )
+    ? value.pairingPayload
+    : null;
+  const sessionSource = nestedPairingSession || value;
+  const normalized = {};
+  const createdAt = normalizeNonEmptyString(value.createdAt);
+  if (createdAt) {
+    normalized.createdAt = createdAt;
+  }
+
+  const pairingSessionId = normalizeNonEmptyString(sessionSource.pairingSessionId);
+  if (pairingSessionId) {
+    normalized.pairingSessionId = pairingSessionId;
+  }
+
+  const pairingCode = normalizeNonEmptyString(sessionSource.pairingCode);
+  if (pairingCode) {
+    normalized.pairingCode = pairingCode;
+  }
+
+  const expiresAt = Number(sessionSource.expiresAt);
+  if (Number.isFinite(expiresAt) && expiresAt > 0) {
+    normalized.expiresAt = expiresAt;
+  }
+
+  const pairingPayload = normalizePairingPayload(
+    nestedPairingSession
+      ? nestedPairingSession.pairingPayload
+      : value.pairingPayload
+  );
+  if (pairingPayload) {
+    normalized.pairingPayload = pairingPayload;
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+function normalizePairingPayload(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const normalized = {};
+  const version = Number(value.v);
+  const relay = normalizeNonEmptyString(value.relay);
+  const sessionId = normalizeNonEmptyString(value.sessionId);
+  const macDeviceId = normalizeNonEmptyString(value.macDeviceId);
+  const macIdentityPublicKey = normalizeNonEmptyString(value.macIdentityPublicKey);
+  const expiresAt = Number(value.expiresAt);
+
+  if (Number.isFinite(version) && version > 0) {
+    normalized.v = version;
+  }
+  if (relay) {
+    normalized.relay = relay;
+  }
+  if (sessionId) {
+    normalized.sessionId = sessionId;
+  }
+  if (macDeviceId) {
+    normalized.macDeviceId = macDeviceId;
+  }
+  if (macIdentityPublicKey) {
+    normalized.macIdentityPublicKey = macIdentityPublicKey;
+  }
+  if (Number.isFinite(expiresAt) && expiresAt > 0) {
+    normalized.expiresAt = expiresAt;
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : null;
 }
 
 function writeJsonFile(targetPath, value, { fsImpl = fs } = {}) {
