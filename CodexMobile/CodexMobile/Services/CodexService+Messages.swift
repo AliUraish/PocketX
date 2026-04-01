@@ -1938,6 +1938,21 @@ extension CodexService {
             streamingAssistantMessageByTurnID.removeValue(forKey: turnStreamingKey)
         }
 
+        // A forced thread/resume or thread/read can materialize the assistant row before
+        // the live item/started or first delta arrives. Reuse that existing row instead of
+        // appending a second assistant bubble for the same in-flight response.
+        if let adoptedMessageID = adoptExistingAssistantMessageForStreaming(
+            threadId: threadId,
+            turnId: turnId,
+            itemId: normalizedItemId
+        ) {
+            streamingAssistantMessageByTurnID[turnStreamingKey] = adoptedMessageID
+            if let itemStreamingKey {
+                streamingAssistantMessageByTurnID[itemStreamingKey] = adoptedMessageID
+            }
+            return
+        }
+
         let message = CodexMessage(
             threadId: threadId,
             role: .assistant,
@@ -1953,6 +1968,52 @@ extension CodexService {
             streamingAssistantMessageByTurnID[itemStreamingKey] = message.id
         }
         appendMessage(message)
+    }
+
+    // Rebinds a history-materialized assistant row back into the live-stream map so
+    // turn/resume snapshots cannot create a second assistant bubble when streaming resumes.
+    func adoptExistingAssistantMessageForStreaming(
+        threadId: String,
+        turnId: String,
+        itemId: String?
+    ) -> String? {
+        guard var threadMessages = messagesByThread[threadId],
+              let messageIndex = threadMessages.indices.reversed().first(where: { index in
+                  let candidate = threadMessages[index]
+                  guard candidate.role == .assistant, candidate.turnId == turnId else {
+                      return false
+                  }
+
+                  let existingItemId = normalizedStreamingItemID(candidate.itemId)
+                  if let itemId {
+                      return existingItemId == nil || existingItemId == itemId
+                  }
+
+                  return true
+              }) else {
+            return nil
+        }
+
+        let messageID = threadMessages[messageIndex].id
+        var didMutate = false
+
+        if !threadMessages[messageIndex].isStreaming {
+            threadMessages[messageIndex].isStreaming = true
+            didMutate = true
+        }
+
+        if threadMessages[messageIndex].itemId == nil, let itemId {
+            threadMessages[messageIndex].itemId = itemId
+            didMutate = true
+        }
+
+        if didMutate {
+            messagesByThread[threadId] = threadMessages
+            persistMessages()
+            updateCurrentOutput(for: threadId)
+        }
+
+        return messageID
     }
 
     // Streams assistant delta chunks into the message linked to a turn.
