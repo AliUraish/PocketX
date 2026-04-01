@@ -1,7 +1,7 @@
 // FILE: secure-transport.js
 // Purpose: Owns the bridge-side E2EE handshake, envelope crypto, and reconnect catch-up buffer.
 // Layer: CLI helper
-// Exports: createBridgeSecureTransport, SECURE_PROTOCOL_VERSION, PAIRING_QR_VERSION
+// Exports: createBridgeSecureTransport plus secure pairing/session constants
 // Depends on: crypto, ./secure-device-state
 
 const {
@@ -14,6 +14,7 @@ const {
   generateKeyPairSync,
   hkdfSync,
   randomBytes,
+  randomUUID,
   sign,
   verify,
 } = require("crypto");
@@ -22,16 +23,20 @@ const {
   rememberTrustedPhone,
 } = require("./secure-device-state");
 
-const PAIRING_QR_VERSION = 2;
+const PAIRING_PROTOCOL_VERSION = 2;
+const PAIRING_QR_VERSION = PAIRING_PROTOCOL_VERSION;
 const SECURE_PROTOCOL_VERSION = 1;
-const HANDSHAKE_TAG = "remodex-e2ee-v1";
-const HANDSHAKE_MODE_QR_BOOTSTRAP = "qr_bootstrap";
+const HANDSHAKE_TAG = "rimcodex-e2ee-v1";
+const HANDSHAKE_MODE_PAIRING_BOOTSTRAP = "pairing_bootstrap";
+const HANDSHAKE_MODE_QR_BOOTSTRAP = HANDSHAKE_MODE_PAIRING_BOOTSTRAP;
 const HANDSHAKE_MODE_TRUSTED_RECONNECT = "trusted_reconnect";
 const SECURE_SENDER_MAC = "mac";
 const SECURE_SENDER_IPHONE = "iphone";
 const MAX_PAIRING_AGE_MS = 5 * 60 * 1000;
 const MAX_BRIDGE_OUTBOUND_MESSAGES = 500;
 const MAX_BRIDGE_OUTBOUND_BYTES = 10 * 1024 * 1024;
+const PAIRING_CODE_LENGTH = 8;
+const PAIRING_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function createBridgeSecureTransport({
   sessionId,
@@ -51,17 +56,32 @@ function createBridgeSecureTransport({
   let nextBridgeOutboundSeq = 1;
   let outboundBufferBytes = 0;
   const outboundBuffer = [];
+  let currentPairingSession = null;
+
+  function createPairingSession() {
+    currentPairingExpiresAt = Date.now() + MAX_PAIRING_AGE_MS;
+    currentPairingSession = {
+      pairingSessionId: randomUUID(),
+      pairingCode: generatePairingCode(),
+      expiresAt: currentPairingExpiresAt,
+      pairingPayload: {
+        v: PAIRING_PROTOCOL_VERSION,
+        relay: relayUrl,
+        sessionId,
+        macDeviceId: currentDeviceState.macDeviceId,
+        macIdentityPublicKey: currentDeviceState.macIdentityPublicKey,
+        expiresAt: currentPairingExpiresAt,
+      },
+    };
+    return currentPairingSession;
+  }
 
   function createPairingPayload() {
-    currentPairingExpiresAt = Date.now() + MAX_PAIRING_AGE_MS;
-    return {
-      v: PAIRING_QR_VERSION,
-      relay: relayUrl,
-      sessionId,
-      macDeviceId: currentDeviceState.macDeviceId,
-      macIdentityPublicKey: currentDeviceState.macIdentityPublicKey,
-      expiresAt: currentPairingExpiresAt,
-    };
+    return createPairingSession().pairingPayload;
+  }
+
+  function readPairingSession() {
+    return currentPairingSession;
   }
 
   function handleIncomingWireMessage(rawMessage, { sendControlMessage, onApplicationMessage }) {
@@ -75,7 +95,7 @@ function createBridgeSecureTransport({
       if (parsed.method || parsed.id != null) {
         sendControlMessage(createSecureError({
           code: "update_required",
-          message: "This bridge requires the latest Remodex iPhone app for secure pairing.",
+          message: "This bridge requires the latest rimcodex iPhone app for secure pairing.",
         }));
         return true;
       }
@@ -153,7 +173,10 @@ function createBridgeSecureTransport({
       return;
     }
 
-    if (handshakeMode !== HANDSHAKE_MODE_QR_BOOTSTRAP && handshakeMode !== HANDSHAKE_MODE_TRUSTED_RECONNECT) {
+    if (
+      handshakeMode !== HANDSHAKE_MODE_PAIRING_BOOTSTRAP
+      && handshakeMode !== HANDSHAKE_MODE_TRUSTED_RECONNECT
+    ) {
       sendControlMessage(createSecureError({
         code: "invalid_handshake_mode",
         message: "The iPhone requested an unknown secure pairing mode.",
@@ -161,10 +184,10 @@ function createBridgeSecureTransport({
       return;
     }
 
-    if (handshakeMode === HANDSHAKE_MODE_QR_BOOTSTRAP && Date.now() > currentPairingExpiresAt) {
+    if (handshakeMode === HANDSHAKE_MODE_PAIRING_BOOTSTRAP && Date.now() > currentPairingExpiresAt) {
       sendControlMessage(createSecureError({
         code: "pairing_expired",
-        message: "The pairing QR code has expired. Generate a new QR code from the bridge.",
+        message: "The pairing code has expired. Generate a new code from the bridge.",
       }));
       return;
     }
@@ -174,7 +197,7 @@ function createBridgeSecureTransport({
       if (!trustedPhonePublicKey) {
         sendControlMessage(createSecureError({
           code: "phone_not_trusted",
-          message: "This iPhone is not trusted by the current bridge session. Scan a fresh QR code to pair again.",
+          message: "This iPhone is not trusted by the current bridge session. Enter a fresh pairing code to pair again.",
         }));
         return;
       }
@@ -201,7 +224,7 @@ function createBridgeSecureTransport({
     const publicJwk = ephemeral.publicKey.export({ format: "jwk" });
     const serverNonce = randomBytes(32);
     const keyEpoch = nextKeyEpoch;
-    const expiresAtForTranscript = handshakeMode === HANDSHAKE_MODE_QR_BOOTSTRAP
+    const expiresAtForTranscript = handshakeMode === HANDSHAKE_MODE_PAIRING_BOOTSTRAP
       ? currentPairingExpiresAt
       : 0;
     const transcriptBytes = buildTranscriptBytes({
@@ -350,7 +373,7 @@ function createBridgeSecureTransport({
 
     nextKeyEpoch = pendingHandshake.keyEpoch + 1;
     if (
-      pendingHandshake.handshakeMode === HANDSHAKE_MODE_QR_BOOTSTRAP
+      pendingHandshake.handshakeMode === HANDSHAKE_MODE_PAIRING_BOOTSTRAP
       || getTrustedPhonePublicKey(currentDeviceState, pendingHandshake.phoneDeviceId)
     ) {
       // Lock the trusted phone identity so later reconnects can be verified cleanly.
@@ -367,7 +390,8 @@ function createBridgeSecureTransport({
         onTrustedPhoneUpdate?.(currentDeviceState);
       }
     }
-    if (pendingHandshake.handshakeMode === HANDSHAKE_MODE_QR_BOOTSTRAP) {
+    if (pendingHandshake.handshakeMode === HANDSHAKE_MODE_PAIRING_BOOTSTRAP) {
+      currentPairingSession = null;
       resetOutboundReplayState();
     }
 
@@ -474,7 +498,7 @@ function createBridgeSecureTransport({
     }
   }
 
-  // Starts each fresh QR bootstrap with a clean catch-up window for the single trusted phone.
+  // Starts each fresh pairing bootstrap with a clean catch-up window for the single trusted phone.
   function resetOutboundReplayState() {
     outboundBuffer.length = 0;
     outboundBufferBytes = 0;
@@ -523,18 +547,21 @@ function createBridgeSecureTransport({
   }
 
   return {
+    PAIRING_PROTOCOL_VERSION,
     PAIRING_QR_VERSION,
     SECURE_PROTOCOL_VERSION,
     bindLiveSendWireMessage,
+    createPairingSession,
     createPairingPayload,
     handleIncomingWireMessage,
     isSecureChannelReady,
     queueOutboundApplicationMessage,
+    readPairingSession,
   };
 }
 
 function debugSecureLog(message) {
-  console.log(`[remodex][secure] ${message}`);
+  console.log(`[rimcodex][secure] ${message}`);
 }
 
 function shortId(value) {
@@ -728,9 +755,20 @@ function base64ToBase64Url(value) {
   return value.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
+function generatePairingCode() {
+  let code = "";
+  while (code.length < PAIRING_CODE_LENGTH) {
+    const randomIndex = randomBytes(1)[0] % PAIRING_CODE_ALPHABET.length;
+    code += PAIRING_CODE_ALPHABET[randomIndex];
+  }
+  return code;
+}
+
 module.exports = {
+  HANDSHAKE_MODE_PAIRING_BOOTSTRAP,
   HANDSHAKE_MODE_QR_BOOTSTRAP,
   HANDSHAKE_MODE_TRUSTED_RECONNECT,
+  PAIRING_PROTOCOL_VERSION,
   PAIRING_QR_VERSION,
   SECURE_PROTOCOL_VERSION,
   createBridgeSecureTransport,

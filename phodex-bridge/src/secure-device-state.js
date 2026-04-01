@@ -1,5 +1,5 @@
 // FILE: secure-device-state.js
-// Purpose: Persists canonical bridge identity and trusted-phone state for local QR pairing.
+// Purpose: Persists canonical bridge identity and trusted-phone state for local pairing bootstrap.
 // Layer: CLI helper
 // Exports: loadOrCreateBridgeDeviceState, resetBridgeDeviceState, rememberTrustedPhone, getTrustedPhonePublicKey, resolveBridgeRelaySession
 // Depends on: fs, os, path, crypto, child_process
@@ -10,9 +10,9 @@ const path = require("path");
 const { randomUUID, generateKeyPairSync } = require("crypto");
 const { execFileSync } = require("child_process");
 
-const DEFAULT_STORE_DIR = path.join(os.homedir(), ".remodex");
+const DEFAULT_STORE_DIR = path.join(os.homedir(), ".rimcodex");
 const DEFAULT_STORE_FILE = path.join(DEFAULT_STORE_DIR, "device-state.json");
-const KEYCHAIN_SERVICE = "com.remodex.bridge.device-state";
+const KEYCHAIN_SERVICE = "com.rimcodex.bridge.device-state";
 const KEYCHAIN_ACCOUNT = "default";
 let hasLoggedKeychainMismatch = false;
 
@@ -29,7 +29,7 @@ function loadOrCreateBridgeDeviceState() {
   if (fileRecord.error) {
     if (keychainRecord.state) {
       warnOnce(
-        "[remodex] Recovering the canonical device-state.json from the legacy Keychain pairing mirror."
+        "[rimcodex] Recovering the canonical device-state.json from the legacy Keychain pairing mirror."
       );
       writeBridgeDeviceState(keychainRecord.state);
       return keychainRecord.state;
@@ -51,7 +51,7 @@ function loadOrCreateBridgeDeviceState() {
   return nextState;
 }
 
-// Removes the saved bridge identity/trust state so the next `remodex up` requires a fresh QR pairing.
+// Removes the saved bridge identity/trust state so the next `rimcodex up` requires a fresh pairing.
 function resetBridgeDeviceState() {
   const removedCanonicalFile = deleteCanonicalFileState();
   const removedKeychainMirror = deleteKeychainStateString();
@@ -62,7 +62,7 @@ function resetBridgeDeviceState() {
   };
 }
 
-// Generates a fresh relay session for every bridge launch so QR pairing stays explicit per-run.
+// Generates a fresh relay session for every bridge launch so pairing stays explicit per-run.
 function resolveBridgeRelaySession(state, { persist = true } = {}) {
   return {
     deviceState: state,
@@ -79,7 +79,7 @@ function rememberTrustedPhone(state, phoneDeviceId, phoneIdentityPublicKey, { pe
     return state;
   }
 
-  // Remodex supports one trusted iPhone per Mac, so a new trust record replaces old ones.
+  // rimcodex supports one trusted iPhone per Mac, so a new trust record replaces old ones.
   const nextState = normalizeBridgeDeviceState({
     ...state,
     trustedPhones: {
@@ -172,16 +172,20 @@ function writeCanonicalFileStateString(serialized) {
 }
 
 function resolveStoreDir() {
-  return normalizeNonEmptyString(process.env.REMODEX_DEVICE_STATE_DIR) || DEFAULT_STORE_DIR;
+  return normalizeNonEmptyString(process.env.RIMCODEX_DEVICE_STATE_DIR)
+    || normalizeNonEmptyString(process.env.REMODEX_DEVICE_STATE_DIR)
+    || DEFAULT_STORE_DIR;
 }
 
 function resolveStoreFile() {
-  return normalizeNonEmptyString(process.env.REMODEX_DEVICE_STATE_FILE)
+  return normalizeNonEmptyString(process.env.RIMCODEX_DEVICE_STATE_FILE)
+    || normalizeNonEmptyString(process.env.REMODEX_DEVICE_STATE_FILE)
     || path.join(resolveStoreDir(), "device-state.json");
 }
 
 function resolveKeychainMirrorFile() {
-  return normalizeNonEmptyString(process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE);
+  return normalizeNonEmptyString(process.env.RIMCODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE)
+    || normalizeNonEmptyString(process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE);
 }
 
 function readKeychainStateString() {
@@ -301,7 +305,7 @@ function deleteCanonicalFileState() {
 // Prefers the canonical file, but repairs or warns about stale legacy Keychain mirrors.
 function reconcileLegacyKeychainMirror(canonicalState, keychainRecord) {
   if (keychainRecord.error) {
-    warnOnce("[remodex] Ignoring unreadable legacy Keychain pairing mirror; using canonical device-state.json.");
+    warnOnce("[rimcodex] Ignoring unreadable legacy Keychain pairing mirror; using canonical device-state.json.");
     return;
   }
 
@@ -314,7 +318,7 @@ function reconcileLegacyKeychainMirror(canonicalState, keychainRecord) {
     return;
   }
 
-  warnOnce("[remodex] Canonical bridge pairing state differs from the legacy Keychain mirror; using device-state.json.");
+  warnOnce("[rimcodex] Canonical bridge pairing state differs from the legacy Keychain mirror; using device-state.json.");
   writeKeychainStateString(JSON.stringify(canonicalState, null, 2));
 }
 
@@ -362,8 +366,8 @@ function normalizeNonEmptyString(value) {
 function corruptedStateError(source, error) {
   const detail = normalizeNonEmptyString(error?.message);
   return new Error(
-    `The saved Remodex pairing state in ${source} is unreadable. `
-      + "Run `remodex reset-pairing` to start fresh."
+    `The saved rimcodex pairing state in ${source} is unreadable. `
+      + "Run `rimcodex reset-pairing` to start fresh."
       + (detail ? ` (${detail})` : "")
   );
 }
