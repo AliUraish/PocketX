@@ -4,6 +4,8 @@
 
 # Remodex
 
+Sync test marker: README updated from the Mac bridge session.
+
 [![npm version](https://img.shields.io/npm/v/remodex)](https://www.npmjs.com/package/remodex)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 [Follow on X](https://x.com/emanueledpt)
