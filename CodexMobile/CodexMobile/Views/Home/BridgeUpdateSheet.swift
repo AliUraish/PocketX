@@ -11,7 +11,7 @@ struct BridgeUpdateSheet: View {
     let prompt: CodexBridgeUpdatePrompt
     let isRetrying: Bool
     let onRetry: () -> Void
-    let onScanNewQR: () -> Void
+    let onEnterNewCode: () -> Void
     let onDismiss: () -> Void
 
     @State private var didCopyCommand = false
@@ -96,7 +96,7 @@ struct BridgeUpdateSheet: View {
                     .buttonStyle(.plain)
                     .disabled(isRetrying)
 
-                    Button("Scan New QR Code", action: onScanNewQR)
+                    Button("Enter New Pairing Code", action: onEnterNewCode)
                         .font(AppFont.body(weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)

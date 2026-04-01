@@ -46,8 +46,8 @@ final class ContentViewModel {
         return true
     }
 
-    // Connects to the relay WebSocket using a scanned QR code payload.
-    func connectToRelay(pairingPayload: CodexPairingQRPayload, codex: CodexService) async {
+    // Connects to the relay WebSocket using an already-resolved pairing bootstrap payload.
+    func connectToRelay(pairingPayload: CodexPairingBootstrapPayload, codex: CodexService) async {
         await stopAutoReconnectForManualScan(codex: codex)
         // Avoid logging live pairing metadata; the relay URL path includes a bearer-like session id.
         let fullURL = "\(pairingPayload.relay)/\(pairingPayload.sessionId)"
@@ -62,6 +62,35 @@ final class ContentViewModel {
         } catch {
             if codex.lastErrorMessage?.isEmpty ?? true {
                 codex.lastErrorMessage = codex.userFacingConnectFailureMessage(error)
+            }
+        }
+    }
+
+    func connectToRelay(
+        pairingCode: String,
+        relayURL: String,
+        deviceName: String?,
+        codex: CodexService
+    ) async {
+        await stopAutoReconnectForManualScan(codex: codex)
+
+        do {
+            let pairingPayload = try await codex.claimPairingCode(
+                pairingCode: pairingCode,
+                relayURL: relayURL,
+                deviceName: deviceName
+            )
+            let fullURL = "\(pairingPayload.relay)/\(pairingPayload.sessionId)"
+            codex.rememberRelayPairing(pairingPayload)
+
+            try await connectWithAutoRecovery(
+                codex: codex,
+                serverURL: fullURL,
+                performAutoRetry: true
+            )
+        } catch {
+            if codex.lastErrorMessage?.isEmpty ?? true {
+                codex.lastErrorMessage = error.localizedDescription
             }
         }
     }
@@ -136,7 +165,7 @@ final class ContentViewModel {
         }
     }
 
-    // Lets the manual QR flow take over instead of competing with the foreground reconnect loop.
+    // Lets the manual pairing flow take over instead of competing with the foreground reconnect loop.
     func stopAutoReconnectForManualScan(codex: CodexService) async {
         shouldCancelManualReconnect = true
         codex.shouldAutoReconnectOnForeground = false
@@ -391,7 +420,7 @@ extension ContentViewModel {
         }
     }
 
-    // Chooses the best reconnect path: resolve the live trusted-Mac session first, then fall back to the saved QR session.
+    // Chooses the best reconnect path: resolve the live trusted-Mac session first, then fall back to the saved relay session.
     func preferredReconnectURL(codex: CodexService) async -> String? {
         switch await trustedReconnectResolution(codex: codex) {
         case .use(let resolvedURL):
@@ -444,7 +473,7 @@ extension ContentViewModel {
         case .unsupportedRelay:
             if !codex.hasSavedRelaySession {
                 codex.connectionRecoveryState = .idle
-                codex.lastErrorMessage = "This relay needs a fresh QR scan before trusted reconnect is available."
+                codex.lastErrorMessage = "This relay needs a fresh pairing before trusted reconnect is available."
                 return .stop
             }
             return .fallbackToSaved
@@ -471,7 +500,7 @@ extension ContentViewModel {
         }
     }
 
-    // Reuses the last QR-resolved session when trusted lookup is unavailable or not yet supported end-to-end.
+    // Reuses the last resolved session when trusted lookup is unavailable or not yet supported end-to-end.
     private func savedReconnectURL(codex: CodexService) -> String? {
         guard let sessionId = codex.normalizedRelaySessionId,
               let relayURL = codex.normalizedRelayURL else {
