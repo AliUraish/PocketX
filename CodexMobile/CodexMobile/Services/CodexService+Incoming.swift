@@ -157,6 +157,15 @@ extension CodexService {
             }
 
             enqueuePendingApproval(request)
+            if let threadId = request.threadId?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !threadId.isEmpty {
+                notifyApprovalRequestIfNeeded(
+                    threadId: threadId,
+                    turnId: request.turnId,
+                    requestID: requestID,
+                    reason: request.reason
+                )
+            }
             return
         }
 
@@ -184,8 +193,11 @@ extension CodexService {
         switch method {
         case "bridge/healthChanged":
             if let paramsObject {
+                let previousHealthState = bridgeHealthState
                 let previousPendingApprovalCount = pendingApprovalRequests.count
                 applyBridgeHealthSnapshot(from: paramsObject)
+                let nextHealthState = bridgeHealthState
+                notifyBridgeHealthTransitionIfNeeded(from: previousHealthState, to: nextHealthState)
                 if isBridgeProtocolAvailable,
                    let pendingApprovalCount = bridgeHealthSnapshot?.pendingApprovalCount,
                    pendingApprovalCount != previousPendingApprovalCount {
