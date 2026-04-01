@@ -63,7 +63,10 @@ function mapBridgeProtocolMethodToCodexMethod(method) {
   return BRIDGE_PROXY_METHOD_TO_CODEX_METHOD[method] || "";
 }
 
-function buildBridgeCapabilities({ packageVersionStatus = null } = {}) {
+function buildBridgeCapabilities({
+  packageVersionStatus = null,
+  runtimeCapabilitySnapshot = null,
+} = {}) {
   return {
     bridgeManaged: true,
     bridgeProtocolVersion: BRIDGE_PROTOCOL_VERSION,
@@ -91,6 +94,15 @@ function buildBridgeCapabilities({ packageVersionStatus = null } = {}) {
     },
     bridgeVersion: readString(packageVersionStatus?.bridgeVersion) || null,
     bridgeLatestVersion: readString(packageVersionStatus?.bridgeLatestVersion) || null,
+    codexVersion: readString(runtimeCapabilitySnapshot?.codexVersion) || null,
+    runtimeCapabilities: compactObject({
+      planCollaborationMode: readBoolean(runtimeCapabilitySnapshot?.capabilities?.planCollaborationMode),
+      serviceTier: readBoolean(runtimeCapabilitySnapshot?.capabilities?.serviceTier),
+      threadFork: readBoolean(runtimeCapabilitySnapshot?.capabilities?.threadFork),
+      accountStatusRead: true,
+      voiceResolveAuth: true,
+    }),
+    runtimeCapabilityProbeAt: clampPositiveInteger(runtimeCapabilitySnapshot?.probedAt) || null,
   };
 }
 
@@ -417,6 +429,10 @@ function readArray(value) {
 
 function readString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function readBoolean(value) {
+  return typeof value === "boolean" ? value : undefined;
 }
 
 function firstNonEmptyString(values) {
