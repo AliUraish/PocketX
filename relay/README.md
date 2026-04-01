@@ -1,8 +1,8 @@
 # Relay
 
-This folder contains the public relay and push-service code used by Remodex pairing and trusted reconnect.
+This folder contains the public relay and push-service code used by rimcodex pairing and trusted reconnect.
 
-The point of keeping this code in the repo is transparency: anyone forking Remodex can inspect the transport boundary, verify the encrypted-session flow, and run a compatible relay of their own. What should stay private is the actual deployed endpoint and any production credentials.
+The point of keeping this code in the repo is transparency: anyone forking rimcodex can inspect the transport boundary, verify the encrypted-session flow, and run a compatible relay of their own. What should stay private is the actual deployed endpoint and any production credentials.
 
 ## What It Does
 
@@ -19,32 +19,34 @@ The point of keeping this code in the repo is transparency: anyone forking Remod
 - it does not run Codex
 - it does not execute git commands
 - it does not contain the user's repository checkout
-- it does not decrypt Remodex application payloads after the secure session is established
+- it does not decrypt rimcodex application payloads after the secure session is established
 
 Codex, git, and local file operations still run on the user's Mac.
 
 ## Security Model
 
-Remodex uses the relay as a transport hop, not as a trusted application server.
+rimcodex uses the relay as a transport hop, not as a trusted application server.
 
-- The pairing QR gives the iPhone the bridge identity public key plus short-lived session details.
-- After the first successful QR bootstrap, the relay can help the iPhone find the Mac's current live session again through a signed trusted-session resolve request.
+- The one-time pairing code unlocks a short-lived bootstrap payload with the bridge identity public key plus session details.
+- After the first successful pairing bootstrap, the relay can help the iPhone find the Mac's current live session again through a signed trusted-session resolve request.
 - The iPhone and bridge perform a signed handshake, derive shared AES-256-GCM keys with X25519 + HKDF-SHA256, and then encrypt application payloads end to end.
 - The relay can still observe connection metadata and the plaintext secure control messages needed to establish the encrypted session.
-- The relay does not receive plaintext Remodex application payloads after the secure session is active.
+- The relay does not receive plaintext rimcodex application payloads after the secure session is active.
 
 ## Relay Flow
 
 ```mermaid
 flowchart TD
     A[Mac bridge starts] --> B[Bridge creates sessionId and notification secret]
-    B --> C[Bridge prints QR with relay URL, sessionId, bridge identity key, expiry]
+    B --> C[Bridge creates short-lived pairing code and bootstrap payload]
     B --> D[Mac opens WebSocket to /relay/{sessionId}<br/>x-role: mac]
     D --> E[Relay creates in-memory session room]
     D --> E2[Relay records macDeviceId plus trusted phone metadata for live-session resolve]
 
-    C --> F[iPhone scans QR]
-    F --> G[iPhone opens WebSocket to /relay/{sessionId}<br/>x-role: iphone]
+    C --> F[iPhone enters pairing code]
+    F --> F2[iPhone calls POST /v1/pairing/code/claim]
+    F2 --> F3[Relay validates code, expiry, and live Mac session]
+    F3 --> G[iPhone opens WebSocket to /relay/{sessionId}<br/>x-role: iphone]
     G --> H{Mac session live?}
     H -- No --> I[Relay closes iPhone socket<br/>4002 session unavailable]
     H -- Yes --> J[Relay binds iPhone to that session]
@@ -99,21 +101,22 @@ flowchart TD
 Optional HTTP endpoints:
 
 - `GET /health`
+- `POST /v1/pairing/code/claim`
 - `POST /v1/trusted/session/resolve`
 - `POST /v1/push/session/register-device`
 - `POST /v1/push/session/notify-completion`
 
-The trusted-session resolve endpoint is intended for phones that have already completed the first QR bootstrap. It returns the current live session only after signature, nonce, and freshness checks pass.
+The trusted-session resolve endpoint is intended for phones that have already completed the first pairing bootstrap. It returns the current live session only after signature, nonce, and freshness checks pass.
 
-Push is disabled by default. Enable it only when you are ready to wire APNs and the bridge-side `REMODEX_PUSH_SERVICE_URL`, for example with `REMODEX_ENABLE_PUSH_SERVICE=true`.
+Push is disabled by default. Enable it only when you are ready to wire APNs and the bridge-side `RIMCODEX_PUSH_SERVICE_URL`, for example with `RIMCODEX_ENABLE_PUSH_SERVICE=true`.
 
 ## Deploy Notes
 
-- Keep the real relay base URL in private config such as `REMODEX_RELAY`, not in committed source.
-- Keep APNs credentials in private env vars or protected files (`REMODEX_APNS_*`).
-- Leave `REMODEX_TRUST_PROXY` unset for direct/self-hosted installs. Set it to `true` only when a trusted reverse proxy is forwarding requests to this relay.
-- When `REMODEX_TRUST_PROXY=true`, configure the proxy to send sanitized client IP headers (`X-Real-Ip` and/or appended `X-Forwarded-For`) instead of passing client-supplied values through unchanged.
-- If you expose the relay under a shared-domain prefix such as `/remodex`, have the proxy strip that prefix before forwarding so the Node server still receives `/relay/...` and `/v1/push/...`.
+- Keep the real relay base URL in private config such as `RIMCODEX_RELAY`, not in committed source.
+- Keep APNs credentials in private env vars or protected files (`RIMCODEX_APNS_*`).
+- Leave `RIMCODEX_TRUST_PROXY` unset for direct/self-hosted installs. Set it to `true` only when a trusted reverse proxy is forwarding requests to this relay.
+- When `RIMCODEX_TRUST_PROXY=true`, configure the proxy to send sanitized client IP headers (`X-Real-Ip` and/or appended `X-Forwarded-For`) instead of passing client-supplied values through unchanged.
+- If you expose the relay under a shared-domain prefix such as `/rimcodex`, have the proxy strip that prefix before forwarding so the Node server still receives `/relay/...` and `/v1/push/...`.
 - The public repo should document the protocol and code, not your real deployed hostname or deploy defaults.
 
 ## Usage
