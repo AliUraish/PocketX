@@ -123,6 +123,10 @@ function startBridge({
   let lastPublishedBridgeHealthSnapshotJSON = "";
   let lastConnectionStatus = null;
   let codexHandshakeState = config.codexEndpoint ? "warm" : "cold";
+  let codexSupervisorState = "running";
+  let codexSupervisorRestartCount = 0;
+  let codexSupervisorNextRetryAt = 0;
+  let codexSupervisorLastError = "";
   let requestedBridgeProtocolVersion = 0;
   const forwardedInitializeRequestIds = new Set();
   const bridgeManagedCodexRequestWaiters = new Map();
@@ -187,29 +191,77 @@ function startBridge({
     logPrefix: "[rimcodex]",
   });
   startBridgeStatusHeartbeat();
-  publishBridgeStatus({
-    state: "starting",
+  publishCurrentBridgeStatus({
     connectionStatus: "starting",
-    pid: process.pid,
+    state: "starting",
     lastError: "",
   });
 
   codex.onError((error) => {
-    publishBridgeStatus({
+    codexSupervisorState = "error";
+    codexSupervisorLastError = error.message;
+    codexSupervisorNextRetryAt = 0;
+    publishCurrentBridgeStatus({
+      connectionStatus: config.codexEndpoint ? "error" : (lastConnectionStatus || "disconnected"),
       state: "error",
-      connectionStatus: "error",
-      pid: process.pid,
       lastError: error.message,
     });
     if (config.codexEndpoint) {
       console.error(`[rimcodex] Failed to connect to Codex endpoint: ${config.codexEndpoint}`);
-    } else {
-      console.error("[rimcodex] Failed to start `codex app-server`.");
-      console.error(`[rimcodex] Launch command: ${codex.describe()}`);
-      console.error("[rimcodex] Make sure the Codex CLI is installed and that the launcher works on this OS.");
+      console.error(error.message);
+      process.exit(1);
+      return;
     }
+
+    console.error("[rimcodex] Local `codex app-server` is unavailable.");
+    console.error(`[rimcodex] Launch command: ${codex.describe()}`);
     console.error(error.message);
-    process.exit(1);
+  });
+
+  codex.onSupervisorEvent?.((event) => {
+    codexHandshakeState = "cold";
+    codexSupervisorState = event?.state || codexSupervisorState;
+    codexSupervisorRestartCount = Number.isFinite(event?.attempt) ? event.attempt : codexSupervisorRestartCount;
+    codexSupervisorNextRetryAt = Number.isFinite(event?.nextRetryAt) ? event.nextRetryAt : 0;
+    codexSupervisorLastError = readString(event?.lastError);
+
+    if (event?.state === "backoff") {
+      handleCodexRuntimeRestart(
+        Object.assign(new Error(codexSupervisorLastError || "Local Codex runtime restarting."), {
+          errorCode: "codex_runtime_restarting",
+          userMessage: codexSupervisorLastError || "Local Codex runtime restarting.",
+        })
+      );
+      publishCurrentBridgeStatus({
+        connectionStatus: lastConnectionStatus || "disconnected",
+        state: "error",
+        lastError: codexSupervisorLastError,
+      });
+      console.error(
+        `[rimcodex] Local \`codex app-server\` exited; retrying in ${Math.max(
+          0,
+          Number(event?.restartDelayMs) || 0
+        )}ms.`
+      );
+      return;
+    }
+
+    if (event?.state === "running") {
+      codexSupervisorLastError = "";
+      codexSupervisorNextRetryAt = 0;
+      publishCurrentBridgeStatus({
+        connectionStatus: lastConnectionStatus || "starting",
+        state: "running",
+        lastError: "",
+      });
+      return;
+    }
+
+    publishCurrentBridgeStatus({
+      connectionStatus: lastConnectionStatus || "starting",
+      state: event?.state === "restarting" ? "starting" : undefined,
+      lastError: codexSupervisorLastError,
+    });
   });
 
   function clearReconnectTimer() {
@@ -297,12 +349,7 @@ function startBridge({
     }
 
     lastConnectionStatus = status;
-    publishBridgeStatus({
-      state: "running",
-      connectionStatus: status,
-      pid: process.pid,
-      lastError: "",
-    });
+    publishCurrentBridgeStatus({ connectionStatus: status });
     console.log(`[rimcodex] ${status}`);
   }
 
@@ -438,10 +485,9 @@ function startBridge({
     clearRelayWatchdog();
     clearBridgeStatusHeartbeat();
     logConnectionStatus("disconnected");
-    publishBridgeStatus({
-      state: "stopped",
+    publishCurrentBridgeStatus({
       connectionStatus: "disconnected",
-      pid: process.pid,
+      state: "stopped",
       lastError: "",
     });
     isShuttingDown = true;
@@ -1093,6 +1139,72 @@ function startBridge({
       waiter.reject(error);
     }
     bridgeManagedCodexRequestWaiters.clear();
+  }
+
+  function failPendingForwardedCodexRequests(error) {
+    for (const requestId of forwardedRequestMethodsById.keys()) {
+      sendApplicationResponse(
+        createJsonRpcErrorResponse(requestId, error, "codex_runtime_restarting")
+      );
+    }
+    forwardedRequestMethodsById.clear();
+
+    for (const requestId of bridgeProtocolForwardedRequestsById.keys()) {
+      sendApplicationResponse(
+        createJsonRpcErrorResponse(requestId, error, "codex_runtime_restarting")
+      );
+    }
+    bridgeProtocolForwardedRequestsById.clear();
+  }
+
+  function handleCodexRuntimeRestart(error) {
+    stopContextUsageWatcher();
+    rolloutLiveMirror?.stopAll();
+    desktopRefresher.handleTransportReset();
+    failBridgeManagedCodexRequests(error);
+    failPendingForwardedCodexRequests(error);
+    relaySanitizedResponseMethodsById.clear();
+    forwardedInitializeRequestIds.clear();
+    pendingAuthLogin.loginId = null;
+    pendingAuthLogin.authUrl = null;
+    pendingAuthLogin.requestId = null;
+    pendingAuthLogin.startedAt = 0;
+    pendingBridgeInboundRequestsById.clear();
+    approvalState.clearPendingApprovals("codex_runtime_restarted");
+    publishBridgeHealthSnapshotIfNeeded();
+  }
+
+  function resolveBridgeRuntimeState(explicitState = "") {
+    const normalizedExplicitState = readString(explicitState);
+    if (normalizedExplicitState) {
+      return normalizedExplicitState;
+    }
+
+    if (codexSupervisorState === "backoff" || codexSupervisorState === "error") {
+      return "error";
+    }
+    if (codexSupervisorState === "starting" || codexSupervisorState === "restarting") {
+      return "starting";
+    }
+    return "running";
+  }
+
+  function publishCurrentBridgeStatus({
+    connectionStatus = lastConnectionStatus || "starting",
+    state = "",
+    lastError = null,
+  } = {}) {
+    publishBridgeStatus({
+      state: resolveBridgeRuntimeState(state),
+      connectionStatus,
+      pid: process.pid,
+      lastError: lastError != null
+        ? lastError
+        : (codexSupervisorLastError || ""),
+      codexSupervisorState,
+      codexRestartCount: codexSupervisorRestartCount,
+      codexNextRetryAt: codexSupervisorNextRetryAt || null,
+    });
   }
 
   function publishBridgeStatus(status) {
