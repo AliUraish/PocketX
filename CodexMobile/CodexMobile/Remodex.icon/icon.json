@@ -1,15 +1,15 @@
 {
-  "fill" : "system-light",
+  "fill" : "system-dark",
   "groups" : [
     {
       "layers" : [
         {
-          "image-name" : "Group 5.png",
-          "name" : "Group 5",
+          "image-name" : "rimcodex.png",
+          "name" : "rimcodex",
           "position" : {
-            "scale" : 1,
+            "scale" : 2,
             "translation-in-points" : [
-              -29.21875,
+              0,
               0
             ]
           }
@@ -17,11 +17,11 @@
       ],
       "shadow" : {
         "kind" : "layer-color",
-        "opacity" : 0.5
+        "opacity" : 0
       },
       "translucency" : {
         "enabled" : false,
-        "value" : 0.5
+        "value" : 0
       }
     }
   ],
