@@ -30,6 +30,7 @@ const { createBridgePackageVersionStatusReader } = require("./package-version-st
 const { createPushNotificationServiceClient } = require("./push-notification-service-client");
 const { createPushNotificationTracker } = require("./push-notification-tracker");
 const { createBridgeApprovalStateStore } = require("./approval-state");
+const { createBridgeEventLogStore } = require("./event-log");
 const {
   loadOrCreateBridgeDeviceState,
   resolveBridgeRelaySession,
@@ -109,6 +110,7 @@ function startBridge({
     bridgeSessionId: sessionId,
     staleAfterMs: PENDING_BRIDGE_REQUEST_STALE_AFTER_MS,
   });
+  const eventLog = createBridgeEventLogStore();
   const readBridgePackageVersionStatus = createBridgePackageVersionStatusReader();
 
   // Keep the local Codex runtime alive across transient relay disconnects.
@@ -158,9 +160,24 @@ function startBridge({
       deviceState = nextDeviceState;
       onPairingSession?.(secureTransport.readPairingSession());
       sendRelayRegistrationUpdate(nextDeviceState);
+      appendBridgeEvent({
+        type: "pairing.trust_updated",
+        level: "info",
+        message: "Updated the trusted iPhone for this Mac.",
+        detail: "Future reconnects can use the saved trusted device session.",
+        metadata: {
+          trustedPhoneCount: Object.keys(nextDeviceState?.trustedPhones || {}).length,
+        },
+      });
     },
   });
   const pairingSession = secureTransport.createPairingSession();
+  appendBridgeEvent({
+    type: "pairing.session_created",
+    level: "info",
+    message: "Created a new manual pairing session.",
+    detail: "The Mac bridge generated a fresh short-lived pairing code.",
+  });
   // Keeps one stable sender identity across reconnects so buffered replay state
   // reflects what actually made it onto the current relay socket.
   function sendRelayWireMessage(wireMessage) {
@@ -216,6 +233,12 @@ function startBridge({
     console.error("[rimcodex] Local `codex app-server` is unavailable.");
     console.error(`[rimcodex] Launch command: ${codex.describe()}`);
     console.error(error.message);
+    appendBridgeEvent({
+      type: "codex.runtime_error",
+      level: "error",
+      message: "Local codex app-server is unavailable.",
+      detail: error.message,
+    });
   });
 
   codex.onSupervisorEvent?.((event) => {
@@ -243,6 +266,16 @@ function startBridge({
           Number(event?.restartDelayMs) || 0
         )}ms.`
       );
+      appendBridgeEvent({
+        type: "codex.restart_backoff",
+        level: "error",
+        message: "Local codex app-server exited unexpectedly.",
+        detail: codexSupervisorLastError || "The bridge will retry the local runtime.",
+        metadata: {
+          restartCount: codexSupervisorRestartCount,
+          restartDelayMs: Math.max(0, Number(event?.restartDelayMs) || 0),
+        },
+      });
       return;
     }
 
@@ -253,6 +286,16 @@ function startBridge({
         connectionStatus: lastConnectionStatus || "starting",
         state: "running",
         lastError: "",
+      });
+      appendBridgeEvent({
+        type: "codex.running",
+        level: "info",
+        message: codexSupervisorRestartCount > 0
+          ? "Recovered the local codex app-server."
+          : "Local codex app-server is running.",
+        metadata: {
+          restartCount: codexSupervisorRestartCount,
+        },
       });
       return;
     }
@@ -328,6 +371,12 @@ function startBridge({
 
       if (hasRelayConnectionGoneStale(lastRelayActivityAt)) {
         console.warn("[rimcodex] relay heartbeat stalled; forcing reconnect");
+        appendBridgeEvent({
+          type: "relay.heartbeat_stalled",
+          level: "warning",
+          message: "Relay heartbeat stalled; forcing reconnect.",
+          detail: "The bridge stopped seeing relay traffic and is resetting the socket.",
+        });
         logConnectionStatus("disconnected");
         trackedSocket.terminate();
         return;
@@ -348,8 +397,22 @@ function startBridge({
       return;
     }
 
+    const previousStatus = lastConnectionStatus;
     lastConnectionStatus = status;
     publishCurrentBridgeStatus({ connectionStatus: status });
+    appendBridgeEvent({
+      type: "relay.connection_status_changed",
+      level: status === "connected" ? "info" : "warning",
+      message: status === "connected"
+        ? "Relay connection restored."
+        : `Relay connection is now ${status}.`,
+      detail: previousStatus && previousStatus !== status
+        ? `Previous status: ${previousStatus}.`
+        : null,
+      metadata: {
+        connectionStatus: status,
+      },
+    });
     console.log(`[rimcodex] ${status}`);
   }
 
@@ -377,6 +440,17 @@ function startBridge({
     reconnectAttempt += 1;
     const delayMs = Math.min(1_000 * reconnectAttempt, 5_000);
     logConnectionStatus("connecting");
+    appendBridgeEvent({
+      type: "relay.reconnect_scheduled",
+      level: "warning",
+      message: "Scheduled a relay reconnect attempt.",
+      detail: `Retry attempt ${reconnectAttempt} in ${delayMs}ms.`,
+      metadata: {
+        attempt: reconnectAttempt,
+        delayMs,
+        closeCode: Number.isFinite(closeCode) ? closeCode : null,
+      },
+    });
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       connectRelay();
@@ -389,6 +463,11 @@ function startBridge({
     }
 
     logConnectionStatus("connecting");
+    appendBridgeEvent({
+      type: "relay.connecting",
+      level: "info",
+      message: "Connecting to the relay.",
+    });
     const nextSocket = new WebSocket(relaySessionUrl, {
       // The relay uses this per-session secret to authenticate the first push registration.
       headers: {
@@ -407,6 +486,11 @@ function startBridge({
       lastPublishedBridgeHealthSnapshotJSON = "";
       startRelayWatchdog(nextSocket);
       logConnectionStatus("connected");
+      appendBridgeEvent({
+        type: "relay.connected",
+        level: "info",
+        message: "Connected to the relay.",
+      });
       secureTransport.bindLiveSendWireMessage(sendRelayWireMessage);
       sendRelayRegistrationUpdate(deviceState);
     });
@@ -441,6 +525,15 @@ function startBridge({
         clearRelayWatchdog();
       }
       logConnectionStatus("disconnected");
+      appendBridgeEvent({
+        type: "relay.closed",
+        level: code === 1000 ? "info" : "warning",
+        message: "Relay socket closed.",
+        detail: Number.isFinite(code) ? `Close code: ${code}.` : null,
+        metadata: {
+          closeCode: Number.isFinite(code) ? code : null,
+        },
+      });
       if (socket === nextSocket) {
         socket = null;
       }
@@ -454,6 +547,11 @@ function startBridge({
       if (socket === nextSocket) {
         clearRelayWatchdog();
       }
+      appendBridgeEvent({
+        type: "relay.error",
+        level: "error",
+        message: "Relay socket error.",
+      });
       logConnectionStatus("disconnected");
     });
   }
@@ -464,6 +562,14 @@ function startBridge({
     printPairingCode(pairingSession);
   }
   pushServiceClient.logUnavailable();
+  appendBridgeEvent({
+    type: "bridge.started",
+    level: "info",
+    message: "Started the rimcodex bridge.",
+    detail: config.codexEndpoint
+      ? "Using an existing Codex endpoint."
+      : "Using a supervised local codex app-server.",
+  });
   connectRelay();
 
   codex.onMessage((message) => {
@@ -602,6 +708,18 @@ function startBridge({
         .catch((error) => {
           sendResponse(createJsonRpcErrorResponse(requestId, error, "bridge_health_failed"));
         });
+      return true;
+    }
+
+    if (method === "bridge/diagnostics/read") {
+      const paramsObject = safeBridgeParamsObject(parsed?.params);
+      const limit = Number(paramsObject?.limit) || Number(paramsObject?.maxEvents) || 50;
+      sendResponse(JSON.stringify({
+        id: requestId,
+        result: {
+          events: eventLog.listRecentEvents(limit),
+        },
+      }));
       return true;
     }
 
@@ -1171,6 +1289,12 @@ function startBridge({
     pendingAuthLogin.startedAt = 0;
     pendingBridgeInboundRequestsById.clear();
     approvalState.clearPendingApprovals("codex_runtime_restarted");
+    appendBridgeEvent({
+      type: "codex.runtime_restarted",
+      level: "warning",
+      message: "Reset bridge-managed runtime state after a Codex restart.",
+      detail: error?.message || null,
+    });
     publishBridgeHealthSnapshotIfNeeded();
   }
 
@@ -1211,6 +1335,14 @@ function startBridge({
     lastPublishedBridgeStatus = status;
     onBridgeStatus?.(status);
     publishBridgeHealthSnapshotIfNeeded();
+  }
+
+  function appendBridgeEvent(event) {
+    try {
+      eventLog.append(event);
+    } catch {
+      // Best-effort only; diagnostics should never block the bridge.
+    }
   }
 
   // Refreshes the relay's trusted-mac index after the pairing bootstrap locks in a phone identity.
@@ -1308,6 +1440,16 @@ function startBridge({
         command: readString(trackedRequest.params?.command),
         reason: readString(trackedRequest.params?.reason),
       });
+      appendBridgeEvent({
+        type: "approval.requested",
+        level: "warning",
+        message: "A run is waiting for approval.",
+        detail: readString(trackedRequest.params?.reason) || null,
+        metadata: {
+          threadId: trackedRequest.threadId || null,
+          turnId: trackedRequest.turnId || null,
+        },
+      });
     }
     publishBridgeHealthSnapshotIfNeeded();
   }
@@ -1325,6 +1467,16 @@ function startBridge({
       approvalState.resolvePendingApproval(requestId, parsed.result, {
         outcome: parsed.error ? "response_error_forwarded" : "response_forwarded",
       });
+      appendBridgeEvent({
+        type: "approval.resolved",
+        level: parsed.error ? "warning" : "info",
+        message: "Resolved a pending approval.",
+        detail: parsed.error ? "The approval completed with an error response." : null,
+        metadata: {
+          threadId: pendingRequest.threadId || null,
+          turnId: pendingRequest.turnId || null,
+        },
+      });
       publishBridgeHealthSnapshotIfNeeded();
     }
   }
@@ -1341,6 +1493,15 @@ function startBridge({
         pendingBridgeInboundRequestsById.delete(requestId);
         if (trackedRequest && isBridgeApprovalMethod(trackedRequest.method)) {
           approvalState.expirePendingApproval(requestId, "stale_timeout");
+          appendBridgeEvent({
+            type: "approval.expired",
+            level: "warning",
+            message: "Expired a stale pending approval.",
+            metadata: {
+              threadId: trackedRequest.threadId || null,
+              turnId: trackedRequest.turnId || null,
+            },
+          });
         }
       }
     }
@@ -1406,6 +1567,15 @@ function startBridge({
     pendingBridgeInboundRequestsById.delete(requestId);
     approvalState.resolvePendingApproval(requestId, result, {
       outcome: "resolved_from_phone",
+    });
+    appendBridgeEvent({
+      type: "approval.resolved",
+      level: "info",
+      message: "Resolved a pending approval from iPhone.",
+      metadata: {
+        threadId: pendingRequest.threadId || null,
+        turnId: pendingRequest.turnId || null,
+      },
     });
     publishBridgeHealthSnapshotIfNeeded();
 
