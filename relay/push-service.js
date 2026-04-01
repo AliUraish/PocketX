@@ -1,5 +1,5 @@
 // FILE: push-service.js
-// Purpose: Stores session-scoped APNs registration state and sends completion pushes for relay-hosted rimcodex sessions.
+// Purpose: Stores session-scoped APNs registration state and sends bridge event pushes for relay-hosted rimcodex sessions.
 // Layer: Hosted service helper
 // Exports: createPushSessionService, createFileBackedPushStateStore, resolvePushStateFilePath
 // Depends on: crypto, fs, os, path, ./apns-client
@@ -145,6 +145,75 @@ function createPushSessionService({
     return { ok: true };
   }
 
+  async function notifyEvent({
+    sessionId,
+    notificationSecret,
+    eventType,
+    threadId,
+    turnId,
+    title,
+    body,
+    dedupeKey,
+    eventPayload,
+  } = {}) {
+    const normalizedSessionId = readString(sessionId);
+    const normalizedSecret = readString(notificationSecret);
+    const normalizedEventType = readString(eventType);
+    const normalizedDedupeKey = readString(dedupeKey);
+    const normalizedThreadId = readString(threadId);
+
+    if (!normalizedSessionId || !normalizedSecret || !normalizedEventType || !normalizedDedupeKey) {
+      throw pushServiceError(
+        "invalid_request",
+        "Push event requires sessionId, notificationSecret, eventType, and dedupeKey.",
+        400
+      );
+    }
+
+    if (!await resolvedCanNotifyCompletion({
+      sessionId: normalizedSessionId,
+      notificationSecret: normalizedSecret,
+    })) {
+      throw pushServiceError(
+        "session_unavailable",
+        "Push event requires an active relay session.",
+        403
+      );
+    }
+
+    pruneDeliveredDedupeKeys();
+    if (deliveredDedupeKeys.has(normalizedDedupeKey)) {
+      return { ok: true, deduped: true };
+    }
+
+    const session = sessions.get(normalizedSessionId);
+    if (!session || !secretsEqual(session.notificationSecret, normalizedSecret)) {
+      throw pushServiceError("unauthorized", "Invalid notification secret for this session.", 403);
+    }
+
+    if (!session.alertsEnabled || !session.deviceToken) {
+      return { ok: true, skipped: true };
+    }
+
+    await apnsClient.sendNotification({
+      deviceToken: session.deviceToken,
+      apnsEnvironment: session.apnsEnvironment,
+      title: normalizePreviewText(title) || fallbackTitleForEventType(normalizedEventType),
+      body: normalizePreviewText(body) || fallbackBodyForEventType(normalizedEventType),
+      payload: {
+        source: "codex.bridgeEvent",
+        eventType: normalizedEventType,
+        threadId: normalizedThreadId || "",
+        turnId: readString(turnId) || "",
+        ...safeNotificationPayloadObject(eventPayload),
+      },
+    });
+
+    deliveredDedupeKeys.set(normalizedDedupeKey, now());
+    persistState("notifyEvent");
+    return { ok: true };
+  }
+
   function getStats() {
     pruneDeliveredDedupeKeys();
     return {
@@ -201,6 +270,7 @@ function createPushSessionService({
   return {
     registerDevice,
     notifyCompletion,
+    notifyEvent,
     getStats,
   };
 }
@@ -316,6 +386,51 @@ function normalizePreviewText(value) {
 
 function fallbackBodyForResult(result) {
   return result === "failed" ? "Run failed" : "Response ready";
+}
+
+function fallbackTitleForEventType(eventType) {
+  switch (eventType) {
+    case "approval_needed":
+      return "rimcodex approval needed";
+    case "bridge_offline":
+      return "rimcodex went offline";
+    case "reconnect_succeeded":
+      return "rimcodex reconnected";
+    case "reconnect_failed":
+      return "rimcodex reconnect failed";
+    default:
+      return "rimcodex";
+  }
+}
+
+function fallbackBodyForEventType(eventType) {
+  switch (eventType) {
+    case "approval_needed":
+      return "Approval needed to continue the run.";
+    case "bridge_offline":
+      return "The Mac bridge is no longer reachable.";
+    case "reconnect_succeeded":
+      return "Your Mac bridge is reachable again.";
+    case "reconnect_failed":
+      return "The Mac bridge could not be restored.";
+    default:
+      return "New rimcodex event.";
+  }
+}
+
+function safeNotificationPayloadObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entryValue]) => {
+      if (typeof entryValue === "string") {
+        return entryValue.trim().length > 0;
+      }
+      return typeof entryValue === "number" || typeof entryValue === "boolean";
+    })
+  );
 }
 
 function resolvePushStateFilePath(env = process.env) {
