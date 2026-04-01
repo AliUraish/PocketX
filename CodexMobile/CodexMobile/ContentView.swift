@@ -9,7 +9,6 @@ import UIKit
 
 struct ContentView: View {
     @Environment(CodexService.self) private var codex
-    @Environment(SubscriptionService.self) private var subscriptions
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
 
@@ -67,6 +66,9 @@ struct ContentView: View {
                     to: thread?.id
                 )
                 codex.activeThreadId = thread?.id
+                if let thread {
+                    codex.rememberLastOpenedThreadID(thread.id)
+                }
             }
             .onChange(of: codex.activeThreadId) { _, activeThreadId in
                 guard let activeThreadId,
@@ -83,15 +85,11 @@ struct ContentView: View {
                 codex.setForegroundState(phase != .background)
                 if phase == .active {
                     Task {
-                        async let subscriptionRefresh: Void = subscriptions.refreshCustomerInfoSilently()
-
                         guard hasSeenOnboarding, !isShowingManualScanner else {
-                            await subscriptionRefresh
                             return
                         }
 
                         await viewModel.attemptAutoReconnectOnForegroundIfNeeded(codex: codex)
-                        await subscriptionRefresh
                     }
                 }
             }
@@ -124,7 +122,7 @@ struct ContentView: View {
                     onRetry: {
                         retryBridgeConnectionAfterUpdate()
                     },
-                    onScanNewQR: {
+                    onEnterNewCode: {
                         presentManualScannerForBridgeRecovery()
                     },
                     onDismiss: {
@@ -176,12 +174,8 @@ struct ContentView: View {
             OnboardingView {
                 finishOnboardingAndShowScanner()
             }
-        } else if subscriptions.bootstrapState == .failed {
-            SubscriptionBootstrapFailureView()
-        } else if subscriptions.bootstrapState != .ready || !subscriptions.hasProAccess {
-            SubscriptionGateView()
         } else if shouldShowQRScanner {
-            qrScannerBody
+            manualPairingBody
         } else {
             mainAppBody
         }
@@ -199,7 +193,7 @@ struct ContentView: View {
         }
     }
 
-    // Lets the scanner step back into onboarding on first run, or into the empty state later on.
+    // Lets the pairing screen step back into onboarding on first run, or into the empty state later on.
     private var scannerBackAction: (() -> Void)? {
         if scannerCanReturnToOnboarding {
             return { returnFromScannerToOnboarding() }
@@ -207,16 +201,19 @@ struct ContentView: View {
         return { dismissScannerToHome() }
     }
 
-    private var qrScannerBody: some View {
-        QRScannerView(
+    private var manualPairingBody: some View {
+        PairWithCodeView(
+            initialRelayURL: codex.normalizedRelayURL ?? AppEnvironment.relayBaseURL,
             onBack: scannerBackAction,
-            onScan: { pairingPayload in
+            onSubmit: { pairingCode, relayURL, deviceName in
                 Task {
                     isShowingManualScanner = false
                     hasDismissedAutomaticScanner = false
                     scannerCanReturnToOnboarding = false
                     await viewModel.connectToRelay(
-                        pairingPayload: pairingPayload,
+                        pairingCode: pairingCode,
+                        relayURL: relayURL,
+                        deviceName: deviceName,
                         codex: codex
                     )
                 }
@@ -293,7 +290,7 @@ struct ContentView: View {
                 statusMessage: codex.lastErrorMessage,
                 securityLabel: codex.secureConnectionState.statusLabel,
                 trustedPairPresentation: codex.trustedPairPresentation,
-                offlinePrimaryButtonTitle: codex.hasReconnectCandidate ? "Reconnect" : "Scan QR Code",
+                offlinePrimaryButtonTitle: codex.hasReconnectCandidate ? "Reconnect" : "Pair with Code",
                 onPrimaryAction: {
                     if homeConnectionPhase == .offline && !codex.hasReconnectCandidate {
                         presentAutomaticScanner()
@@ -306,7 +303,7 @@ struct ContentView: View {
                 }
             ) {
                 if homeConnectionPhase == .connecting || (codex.hasReconnectCandidate && !codex.isConnected) {
-                    Button("Scan New QR Code") {
+                    Button("Enter New Pairing Code") {
                         presentManualScannerAfterStoppingReconnect()
                     }
                     .font(AppFont.subheadline(weight: .semibold))
@@ -435,7 +432,7 @@ struct ContentView: View {
         setSidebar(open: false)
     }
 
-    // Keeps first-run installs in the scanner by default, while still letting users back out later.
+    // Keeps first-run installs in the pairing view by default, while still letting users back out later.
     private var shouldShowQRScanner: Bool {
         guard !codex.isConnected else {
             return false
@@ -550,14 +547,14 @@ struct ContentView: View {
         }
     }
 
-    // Switches the user back to the QR path when the old relay session is no longer useful.
+    // Switches the user back to the pairing-code path when the old relay session is no longer useful.
     private func presentManualScannerForBridgeRecovery() {
         codex.bridgeUpdatePrompt = nil
         isRetryingBridgeUpdate = false
         presentManualScannerAfterStoppingReconnect()
     }
 
-    // Shows the QR scanner immediately and tears down any stale reconnect in the background.
+    // Shows the pairing view immediately and tears down any stale reconnect in the background.
     private func presentManualScannerAfterStoppingReconnect() {
         guard !isShowingManualScanner else {
             return
@@ -572,14 +569,14 @@ struct ContentView: View {
         }
     }
 
-    // Re-opens the scanner after the user backed out to the empty state without a saved pairing.
+    // Re-opens the pairing view after the user backed out to the empty state without a saved pairing.
     private func presentAutomaticScanner() {
         withAnimation {
             hasDismissedAutomaticScanner = false
         }
     }
 
-    // Hides the scanner without forcing the user straight back into the camera on the next render pass.
+    // Hides the pairing view without forcing the user straight back into pairing on the next render pass.
     private func dismissScannerToHome() {
         withAnimation {
             isShowingManualScanner = false
@@ -657,10 +654,13 @@ struct ContentView: View {
     private func syncSelectedThread(with threads: [CodexThread]) {
         if let selected = selectedThread,
            !threads.contains(where: { $0.id == selected.id }) {
+            codex.clearRememberedLastOpenedThreadID(ifMatches: selected.id)
             if codex.activeThreadId == selected.id {
                 return
             }
-            selectedThread = codex.pendingNotificationOpenThreadID == nil ? threads.first : nil
+            selectedThread = codex.pendingNotificationOpenThreadID == nil
+                ? preferredThreadToRestore(from: threads)
+                : nil
             return
         }
 
@@ -673,9 +673,18 @@ struct ContentView: View {
         if selectedThread == nil,
            codex.activeThreadId == nil,
            codex.pendingNotificationOpenThreadID == nil,
-           let first = threads.first {
-            selectedThread = first
+           let preferredThread = preferredThreadToRestore(from: threads) {
+            selectedThread = preferredThread
         }
+    }
+
+    private func preferredThreadToRestore(from threads: [CodexThread]) -> CodexThread? {
+        if let rememberedThreadID = codex.rememberedLastOpenedThreadID(),
+           let rememberedThread = threads.first(where: { $0.id == rememberedThreadID }) {
+            return rememberedThread
+        }
+
+        return threads.first
     }
 }
 
