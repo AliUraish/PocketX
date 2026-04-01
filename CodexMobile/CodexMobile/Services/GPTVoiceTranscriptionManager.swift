@@ -240,39 +240,17 @@ final class GPTVoiceTranscriptionManager: ObservableObject {
     // ─── Mic permission ──────────────────────────────────────────
 
     private func requestMicrophonePermission() async -> Bool {
-#if os(iOS)
-        if #available(iOS 17.0, *) {
-            switch AVAudioApplication.shared.recordPermission {
-            case .granted:
-                return true
-            case .denied:
-                return false
-            case .undetermined:
-                break
-            @unknown default:
-                return false
-            }
-
-            return await withCheckedContinuation { continuation in
-                AVAudioApplication.requestRecordPermission { allowed in
-                    continuation.resume(returning: allowed)
-                }
-            }
-        }
-#endif
-        switch audioSession.recordPermission {
-        case .granted:
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
             return true
-        case .denied:
+        case .denied, .restricted:
             return false
-        case .undetermined:
-            break
         @unknown default:
-            return false
+            break
         }
 
         return await withCheckedContinuation { continuation in
-            audioSession.requestRecordPermission { allowed in
+            AVCaptureDevice.requestAccess(for: .audio) { allowed in
                 continuation.resume(returning: allowed)
             }
         }
@@ -391,7 +369,7 @@ extension GPTVoiceTranscriptionManager {
             return try await transcribeOverride(wavData, token)
         }
 
-        let boundary = "Remodex-\(UUID().uuidString)"
+        let boundary = "rimcodex-\(UUID().uuidString)"
 
         var body = Data()
         body.appendUTF8("--\(boundary)\r\n")
