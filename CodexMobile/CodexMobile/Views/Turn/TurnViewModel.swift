@@ -1111,26 +1111,26 @@ final class TurnViewModel {
         }
     }
 
-    func approve(codex: CodexService) {
+    func approve(_ request: CodexApprovalRequest, codex: CodexService) {
         Task { @MainActor in
             isHandlingApproval = true
             defer { isHandlingApproval = false }
 
             do {
-                try await codex.approvePendingRequest()
+                try await codex.approvePendingRequest(request)
             } catch {
                 // Error message already stored in CodexService.
             }
         }
     }
 
-    func decline(codex: CodexService) {
+    func decline(_ request: CodexApprovalRequest, codex: CodexService) {
         Task { @MainActor in
             isHandlingApproval = true
             defer { isHandlingApproval = false }
 
             do {
-                try await codex.declinePendingRequest()
+                try await codex.declinePendingRequest(request)
             } catch {
                 // Error message already stored in CodexService.
             }
