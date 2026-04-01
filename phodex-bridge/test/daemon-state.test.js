@@ -47,6 +47,41 @@ test("daemon-state stores config, pairing payloads, and status under the rimcode
   });
 });
 
+test("daemon-state preserves the top-level manual pairing code when storing a full pairing session", () => {
+  withTempDaemonEnv(() => {
+    writePairingSession({
+      pairingSessionId: "pairing-session-1",
+      pairingCode: "ABCD1234",
+      expiresAt: 1_710_000_300_000,
+      pairingPayload: {
+        v: 1,
+        relay: "ws://127.0.0.1:9000/relay",
+        sessionId: "session-1",
+        macDeviceId: "mac-1",
+        macIdentityPublicKey: "mac-pub-1",
+        expiresAt: 1_710_000_300_000,
+      },
+    }, {
+      now: () => 1_710_000_000_000,
+    });
+
+    assert.deepEqual(readPairingSession(), {
+      createdAt: "2024-03-09T16:00:00.000Z",
+      pairingSessionId: "pairing-session-1",
+      pairingCode: "ABCD1234",
+      expiresAt: 1710000300000,
+      pairingPayload: {
+        v: 1,
+        relay: "ws://127.0.0.1:9000/relay",
+        sessionId: "session-1",
+        macDeviceId: "mac-1",
+        macIdentityPublicKey: "mac-pub-1",
+        expiresAt: 1710000300000,
+      },
+    });
+  });
+});
+
 test("daemon-state clears stale runtime files without touching the config", () => {
   withTempDaemonEnv(() => {
     writeDaemonConfig({ relayUrl: "ws://127.0.0.1:9000/relay" });
