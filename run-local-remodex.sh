@@ -42,7 +42,7 @@ Options:
 Defaults:
   --bind-host           0.0.0.0
   --port                9000
-  --hostname            macOS LocalHostName.local, then hostname, then localhost
+  --hostname            Tailscale MagicDNS, then Tailscale IPv4, then macOS LocalHostName.local, then hostname, then localhost
 EOF
 }
 
@@ -88,6 +88,22 @@ default_hostname() {
     return
   fi
 
+  local tailscale_hostname
+  tailscale_hostname="$(default_tailscale_hostname)"
+  tailscale_hostname="${tailscale_hostname//[$'\r\n']}"
+  if [[ -n "${tailscale_hostname}" ]]; then
+    printf '%s\n' "${tailscale_hostname}"
+    return
+  fi
+
+  local tailscale_ipv4
+  tailscale_ipv4="$(default_tailscale_ipv4)"
+  tailscale_ipv4="${tailscale_ipv4//[$'\r\n']}"
+  if [[ -n "${tailscale_ipv4}" ]]; then
+    printf '%s\n' "${tailscale_ipv4}"
+    return
+  fi
+
   if command -v scutil >/dev/null 2>&1; then
     local local_host_name
     local_host_name="$(scutil --get LocalHostName 2>/dev/null || true)"
@@ -107,6 +123,45 @@ default_hostname() {
   fi
 
   printf 'localhost\n'
+}
+
+default_tailscale_hostname() {
+  command -v tailscale >/dev/null 2>&1 || return 0
+
+  local dns_name
+  dns_name="$(tailscale status --json 2>/dev/null | node -e '
+let input = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => { input += chunk; });
+process.stdin.on("end", () => {
+  try {
+    const parsed = JSON.parse(input);
+    const rawDnsName = typeof parsed?.Self?.DNSName === "string" ? parsed.Self.DNSName.trim() : "";
+    const normalized = rawDnsName.replace(/\.+$/, "");
+    if (normalized && (normalized.endsWith(".ts.net") || normalized.endsWith(".beta.tailscale.net"))) {
+      process.stdout.write(normalized);
+    }
+  } catch {}
+});
+' 2>/dev/null || true)"
+  dns_name="${dns_name//[$'\r\n']}"
+  if [[ -n "${dns_name}" ]]; then
+    printf '%s\n' "${dns_name}"
+  fi
+}
+
+default_tailscale_ipv4() {
+  command -v tailscale >/dev/null 2>&1 || return 0
+
+  local first_ipv4
+  first_ipv4="$(
+    tailscale ip -4 2>/dev/null \
+      | head -n 1 \
+      | tr -d '\r'
+  )"
+  if [[ -n "${first_ipv4}" ]]; then
+    printf '%s\n' "${first_ipv4}"
+  fi
 }
 
 healthcheck_host() {
