@@ -7,7 +7,7 @@ import SwiftUI
 
 struct SidebarSearchField: View {
     // Mirrors the selected sidebar row so the search field feels like part of the same list system.
-    private let selectedRowCornerRadius: CGFloat = 14
+    private let selectedRowCornerRadius: CGFloat = DesignTokens.CornerRadius.row
 
     @Binding var text: String
     @Binding var isActive: Bool
