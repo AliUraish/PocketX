@@ -17,6 +17,7 @@ struct SidebarView: View {
     let onClose: () -> Void
 
     @State private var searchText = ""
+    @State private var debouncedSearchText = ""
     @State private var isCreatingThread = false
     @State private var groupedThreads: [SidebarThreadGroup] = []
     @State private var isShowingNewChatProjectPicker = false
@@ -25,8 +26,12 @@ struct SidebarView: View {
     @State private var createThreadErrorMessage: String? = nil
     @State private var cachedDiffTotals: [String: TurnSessionDiffTotals] = [:]
     @State private var cachedRunBadges: [String: CodexThreadRunBadgeState] = [:]
+    @State private var cachedTimingLabels: [String: String] = [:]
     @State private var lastDiffFingerprint: Int = 0
     @State private var lastBadgeFingerprint: Int = 0
+    @State private var lastTimingFingerprint: Int = 0
+    @State private var lastGroupingFingerprint: Int = 0
+    @State private var lastGroupingQuery = ""
 
     var body: some View {
         let diffTotalsByThreadID = cachedDiffTotals
@@ -35,7 +40,7 @@ struct SidebarView: View {
             SidebarHeaderView()
 
             SidebarSearchField(text: $searchText, isActive: $isSearchActive)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DesignTokens.Spacing.lg)
                 .padding(.top, 8)
                 .padding(.bottom, 6)
 
@@ -45,7 +50,7 @@ struct SidebarView: View {
                 statusMessage: nil,
                 action: handleNewChatButtonTap
             )
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignTokens.Spacing.lg)
             .padding(.bottom, 10)
 
             SidebarThreadListView(
@@ -56,7 +61,7 @@ struct SidebarView: View {
                 groups: groupedThreads,
                 selectedThread: selectedThread,
                 bottomContentInset: 0,
-                timingLabelProvider: { SidebarRelativeTimeFormatter.compactLabel(for: $0) },
+                timingLabelProvider: { cachedTimingLabels[$0.id] },
                 diffTotalsByThreadID: diffTotalsByThreadID,
                 runBadgeStateByThreadID: cachedRunBadges,
                 onSelectThread: selectThread,
@@ -98,24 +103,35 @@ struct SidebarView: View {
                     )
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignTokens.Spacing.lg)
             .padding(.top, 10)
         }
         .frame(maxHeight: .infinity)
         .background(Color(.systemBackground))
         .task {
-            rebuildGroupedThreads()
-            rebuildCachedSidebarState()
+            rebuildGroupedThreadsIfNeeded(force: true)
+            rebuildCachedSidebarStateIfNeeded(force: true)
             if codex.isConnected, codex.threads.isEmpty {
                 await refreshThreads()
             }
         }
         .onChange(of: codex.threads) { _, _ in
-            rebuildGroupedThreads()
-            rebuildCachedSidebarState()
+            rebuildGroupedThreadsIfNeeded()
+            rebuildCachedSidebarStateIfNeeded()
         }
-        .onChange(of: searchText) { _, _ in
-            rebuildGroupedThreads()
+        .task(id: searchText) {
+            // Debounce: skip the rebuild until the user pauses typing for 200ms.
+            guard !searchText.isEmpty else {
+                debouncedSearchText = ""
+                return
+            }
+            do {
+                try await Task.sleep(nanoseconds: 200_000_000)
+                debouncedSearchText = searchText
+            } catch {}
+        }
+        .onChange(of: debouncedSearchText) { _, _ in
+            rebuildGroupedThreadsIfNeeded()
         }
         .onChange(of: diffFingerprint) { _, _ in
             rebuildCachedDiffTotals()
@@ -239,6 +255,7 @@ struct SidebarView: View {
 
     private func selectThread(_ thread: CodexThread) {
         searchText = ""
+        debouncedSearchText = ""
         codex.activeThreadId = thread.id
         codex.markThreadAsViewed(thread.id)
         selectedThread = thread
@@ -247,6 +264,7 @@ struct SidebarView: View {
 
     private func openSettings() {
         searchText = ""
+        debouncedSearchText = ""
         showSettings = true
         onClose()
     }
@@ -271,9 +289,13 @@ struct SidebarView: View {
         projectGroupPendingArchive = nil
     }
 
-    // Rebuilds sidebar sections only when the source thread array changes.
-    private func rebuildGroupedThreads() {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    // Rebuilds sidebar sections only when search or grouping-relevant thread metadata changed.
+    private func rebuildGroupedThreadsIfNeeded(force: Bool = false) {
+        let query = debouncedSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fingerprint = groupingFingerprint(query: query)
+        guard force || fingerprint != lastGroupingFingerprint || query != lastGroupingQuery else { return }
+        lastGroupingFingerprint = fingerprint
+        lastGroupingQuery = query
         let source: [CodexThread]
         if query.isEmpty {
             source = codex.threads
@@ -308,14 +330,15 @@ struct SidebarView: View {
         return hasher.finalize()
     }
 
-    private func rebuildCachedSidebarState() {
-        rebuildCachedDiffTotals()
-        rebuildCachedRunBadges()
+    private func rebuildCachedSidebarStateIfNeeded(force: Bool = false) {
+        rebuildCachedDiffTotals(force: force)
+        rebuildCachedRunBadges(force: force)
+        rebuildCachedTimingLabels(force: force)
     }
 
-    private func rebuildCachedDiffTotals() {
+    private func rebuildCachedDiffTotals(force: Bool = false) {
         let fp = diffFingerprint
-        guard fp != lastDiffFingerprint else { return }
+        guard force || fp != lastDiffFingerprint else { return }
         lastDiffFingerprint = fp
 
         var byThreadID: [String: TurnSessionDiffTotals] = [:]
@@ -331,9 +354,9 @@ struct SidebarView: View {
         cachedDiffTotals = byThreadID
     }
 
-    private func rebuildCachedRunBadges() {
+    private func rebuildCachedRunBadges(force: Bool = false) {
         let fp = badgeFingerprint
-        guard fp != lastBadgeFingerprint else { return }
+        guard force || fp != lastBadgeFingerprint else { return }
         lastBadgeFingerprint = fp
 
         var byThreadID: [String: CodexThreadRunBadgeState] = [:]
@@ -344,6 +367,50 @@ struct SidebarView: View {
         }
         cachedRunBadges = byThreadID
     }
+
+
+    private func rebuildCachedTimingLabels(force: Bool = false) {
+        let fp = timingFingerprint
+        guard force || fp != lastTimingFingerprint else { return }
+        lastTimingFingerprint = fp
+
+        let now = Date()
+        cachedTimingLabels = Dictionary(
+            uniqueKeysWithValues: codex.threads.compactMap { thread in
+                guard let label = SidebarRelativeTimeFormatter.compactLabel(for: thread, now: now) else {
+                    return nil
+                }
+                return (thread.id, label)
+            }
+        )
+    }
+
+private func groupingFingerprint(query: String) -> Int {
+    var hasher = Hasher()
+    hasher.combine(query)
+    for thread in codex.threads {
+        hasher.combine(thread.id)
+        hasher.combine(thread.displayTitle)
+        hasher.combine(thread.projectDisplayName)
+        hasher.combine(thread.syncState)
+        hasher.combine(thread.parentThreadId)
+        hasher.combine(thread.isSubagent)
+        hasher.combine(thread.updatedAt?.timeIntervalSince1970 ?? 0)
+        hasher.combine(thread.createdAt?.timeIntervalSince1970 ?? 0)
+    }
+    return hasher.finalize()
+}
+
+private var timingFingerprint: Int {
+    var hasher = Hasher()
+    for thread in codex.threads {
+        hasher.combine(thread.id)
+        hasher.combine(thread.updatedAt?.timeIntervalSince1970 ?? 0)
+        hasher.combine(thread.createdAt?.timeIntervalSince1970 ?? 0)
+    }
+    return hasher.finalize()
+}
+
 
     // Keeps the chooser in sync with the same project buckets shown in the sidebar.
     private var newChatProjectChoices: [SidebarProjectChoice] {
