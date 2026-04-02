@@ -43,11 +43,16 @@ struct SidebarThreadListView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 20)
                 } else if groups.flatMap(\.threads).isEmpty && isFiltering {
-                    Text("No matching conversations")
-                        .foregroundStyle(.secondary)
-                        .font(AppFont.subheadline())
-                        .padding(.horizontal, 16)
-                        .padding(.top, 20)
+                    VStack(spacing: DesignTokens.Spacing.sm) {
+                        Image(systemName: "magnifyingglass")
+                            .font(AppFont.title3())
+                            .foregroundStyle(.tertiary)
+                        Text("No matching conversations")
+                            .foregroundStyle(.secondary)
+                            .font(AppFont.subheadline())
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
                 } else {
                     ForEach(groups) { group in
                         groupSection(group)
@@ -113,7 +118,7 @@ struct SidebarThreadListView: View {
             projectHeader(group)
 
             if expandedProjectGroupIDs.contains(group.id) {
-                VStack(spacing: 2) {
+                VStack(spacing: DesignTokens.Spacing.xs) {
                     ForEach(visibleRootThreads) { thread in
                         threadRowTree(
                             thread,
@@ -133,14 +138,14 @@ struct SidebarThreadListView: View {
         }
     }
 
-    @State private var showMoreChevronRotated = false
+    @State private var rotatedShowMoreGroupIDs: Set<String> = []
 
     private func projectGroupShowMoreButton(_ group: SidebarThreadGroup, hiddenCount: Int) -> some View {
         HStack {
             Button {
                 HapticFeedback.shared.triggerImpactFeedback(style: .light)
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    showMoreChevronRotated = true
+                    rotatedShowMoreGroupIDs.insert(group.id)
                     revealedProjectGroupIDs.insert(group.id)
                 }
             } label: {
@@ -148,7 +153,7 @@ struct SidebarThreadListView: View {
                     Text(hiddenCount > 0 ? "Show \(hiddenCount) more" : "Show more")
                     Image(systemName: "chevron.down")
                         .font(AppFont.system(size: 10, weight: .semibold))
-                        .rotationEffect(.degrees(showMoreChevronRotated ? 180 : 0))
+                        .rotationEffect(.degrees(rotatedShowMoreGroupIDs.contains(group.id) ? 180 : 0))
                 }
                 .font(AppFont.caption(weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -159,11 +164,12 @@ struct SidebarThreadListView: View {
         }
         .padding(.leading, 48)
         .padding(.top, 6)
-        .onAppear { showMoreChevronRotated = false }
+        .onAppear { rotatedShowMoreGroupIDs.remove(group.id) }
     }
 
     private func projectHeader(_ group: SidebarThreadGroup) -> some View {
-        HStack(spacing: 12) {
+        let isExpanded = expandedProjectGroupIDs.contains(group.id)
+        return HStack(spacing: 12) {
             Button {
                 HapticFeedback.shared.triggerImpactFeedback(style: .light)
                 toggleProjectGroupExpansion(group.id)
@@ -181,6 +187,12 @@ struct SidebarThreadListView: View {
                         .font(AppFont.body(weight: .medium))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(AppFont.caption(weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .animation(.easeInOut(duration: 0.2), value: isExpanded)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -205,7 +217,7 @@ struct SidebarThreadListView: View {
                     .font(AppFont.system(size: 12, weight: .semibold))
                     .foregroundStyle(.primary)
                     .frame(width: 30, height: 30)
-                    .background(Color.primary.opacity(0.08), in: Circle())
+                    .background(DesignTokens.Colors.iconButtonBackground, in: Circle())
             }
             .buttonStyle(.plain)
             .disabled(!isConnected || isCreatingThread)
@@ -247,7 +259,7 @@ struct SidebarThreadListView: View {
             .padding(.bottom, 10)
 
             if isArchivedExpanded {
-                VStack(spacing: 4) {
+                VStack(spacing: DesignTokens.Spacing.xs) {
                     ForEach(group.threads) { thread in
                         threadRow(thread)
                     }
