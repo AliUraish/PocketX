@@ -60,6 +60,17 @@ struct GitChangedFile: Equatable, Sendable {
     }
 }
 
+enum GitSyncState: String, Sendable {
+    case upToDate = "up_to_date"
+    case aheadOnly = "ahead_only"
+    case behindOnly = "behind_only"
+    case diverged = "diverged"
+    case dirty = "dirty"
+    case dirtyAndBehind = "dirty_and_behind"
+    case noUpstream = "no_upstream"
+    case detachedHead = "detached_head"
+}
+
 struct GitRepoSyncResult: Sendable {
     let repoRoot: String?
     let currentBranch: String?
@@ -73,6 +84,8 @@ struct GitRepoSyncResult: Sendable {
     let isPublishedToRemote: Bool
     let files: [GitChangedFile]
     let repoDiffTotals: GitDiffTotals?
+
+    var syncState: GitSyncState? { GitSyncState(rawValue: state) }
 
     init(from json: [String: JSONValue]) {
         self.repoRoot = json["repoRoot"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
