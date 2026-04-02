@@ -25,11 +25,11 @@ private extension CodexThreadRunBadgeState {
     var color: Color {
         switch self {
         case .running:
-            return .blue
+            return DesignTokens.Colors.runBadgeRunning
         case .ready:
-            return .green
+            return DesignTokens.Colors.runBadgeReady
         case .failed:
-            return .red
+            return DesignTokens.Colors.runBadgeFailed
         }
     }
 }
