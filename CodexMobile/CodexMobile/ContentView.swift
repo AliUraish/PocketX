@@ -334,7 +334,7 @@ struct ContentView: View {
             HapticFeedback.shared.triggerImpactFeedback(style: .light)
             toggleSidebar()
         } label: {
-            TwoLineHamburgerIcon()
+            TwoLineHamburgerIcon(isOpen: isSidebarOpen)
                 .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
                 .padding(8)
                 .contentShape(Circle())
@@ -689,15 +689,24 @@ struct ContentView: View {
 }
 
 private struct TwoLineHamburgerIcon: View {
+    var isOpen: Bool
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        ZStack {
+            // Top bar — rotates to form one arm of the cross
             RoundedRectangle(cornerRadius: 1)
                 .frame(width: 20, height: 2)
+                .rotationEffect(.degrees(isOpen ? 45 : 0))
+                .offset(y: isOpen ? 0 : -3.5)
 
+            // Bottom bar — grows to full width and rotates to form the other arm
             RoundedRectangle(cornerRadius: 1)
-                .frame(width: 10, height: 2)
+                .frame(width: isOpen ? 20 : 10, height: 2)
+                .frame(width: 20, alignment: .leading)
+                .rotationEffect(.degrees(isOpen ? -45 : 0))
+                .offset(y: isOpen ? 0 : 3.5)
         }
-        .frame(width: 20, height: 14, alignment: .leading)
+        .frame(width: 20, height: 14)
     }
 }
 
