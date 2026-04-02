@@ -47,10 +47,16 @@ struct TurnToolbarContent: ToolbarContent {
 
         ToolbarItem(placement: .principal) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(displayTitle)
-                    .font(AppFont.headline())
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                    isShowingPathSheet = true
+                } label: {
+                    Text(displayTitle)
+                        .font(AppFont.headline())
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
 
                 if let context = navigationContext {
                     Button {
