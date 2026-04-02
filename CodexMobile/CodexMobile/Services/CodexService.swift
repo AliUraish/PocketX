@@ -262,6 +262,7 @@ final class ThreadTimelineState {
     var stoppedTurnIDs: Set<String>
     var repoRefreshSignal: String?
     var renderSnapshot: TurnTimelineRenderSnapshot
+    var projectedTimelineCache: ThreadProjectedTimelineCacheEntry?
 
     init(threadID: String) {
         self.threadID = threadID
@@ -273,6 +274,7 @@ final class ThreadTimelineState {
         self.stoppedTurnIDs = []
         self.repoRefreshSignal = nil
         self.renderSnapshot = TurnTimelineRenderSnapshot.empty(threadID: threadID)
+        self.projectedTimelineCache = nil
     }
 }
 
@@ -281,6 +283,11 @@ struct AssistantRevertStateCacheEntry {
     let busyRepoRevision: Int
     let revertStateRevision: Int
     let statesByMessageID: [String: AssistantRevertPresentation]
+}
+
+struct ThreadProjectedTimelineCacheEntry {
+    let messageRevision: Int
+    let projectedMessages: [CodexMessage]
 }
 
 @MainActor
