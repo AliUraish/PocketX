@@ -217,10 +217,10 @@ struct UsageStatusSummaryContent: View {
 
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.primary.opacity(0.1))
+                    .fill(Color.white.opacity(0.15))
 
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.primary)
+                    .fill(Color.white)
                     .frame(width: totalWidth * CGFloat(clampedProgress))
             }
         }
