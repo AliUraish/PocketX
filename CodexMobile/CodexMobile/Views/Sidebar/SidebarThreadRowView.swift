@@ -5,7 +5,7 @@
 
 import SwiftUI
 
-struct SidebarThreadRowView: View {
+struct SidebarThreadRowView: View, Equatable {
     let thread: CodexThread
     let isSelected: Bool
     let runBadgeState: CodexThreadRunBadgeState?
@@ -22,6 +22,16 @@ struct SidebarThreadRowView: View {
     @State private var renamePrompt = ThreadRenamePromptState()
     private let titleLeadingSlotWidth: CGFloat = 16
 
+    static func == (lhs: SidebarThreadRowView, rhs: SidebarThreadRowView) -> Bool {
+        lhs.thread == rhs.thread
+            && lhs.isSelected == rhs.isSelected
+            && lhs.runBadgeState == rhs.runBadgeState
+            && lhs.timingLabel == rhs.timingLabel
+            && lhs.diffTotals == rhs.diffTotals
+            && lhs.childSubagentCount == rhs.childSubagentCount
+            && lhs.isSubagentExpanded == rhs.isSubagentExpanded
+    }
+
     var body: some View {
         Group {
             if thread.isSubagent {
@@ -32,11 +42,11 @@ struct SidebarThreadRowView: View {
         }
         .background {
             if isSelected {
-                Color(.tertiarySystemFill).opacity(0.8)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                DesignTokens.Colors.rowSelected
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.row, style: .continuous))
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, DesignTokens.Spacing.md)
         .contextMenu { contextMenuContent }
         .threadRenamePrompt(state: $renamePrompt) { newName in
             onRename?(newName)
@@ -75,8 +85,8 @@ struct SidebarThreadRowView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .padding(.horizontal, DesignTokens.Spacing.md)
+        .padding(.vertical, DesignTokens.Spacing.md)
     }
 
     private var parentTrailingMeta: some View {
@@ -84,10 +94,10 @@ struct SidebarThreadRowView: View {
             if thread.syncState == .archivedLocal {
                 Text("Archived")
                     .font(AppFont.caption2())
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(DesignTokens.Colors.archiveBadgeForeground)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)
-                    .background(Color.orange.opacity(0.12), in: Capsule())
+                    .background(DesignTokens.Colors.archiveBadgeBackground, in: Capsule())
             }
 
             if let diffTotals {
@@ -124,8 +134,8 @@ struct SidebarThreadRowView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .padding(.horizontal, DesignTokens.Spacing.md)
+        .padding(.vertical, DesignTokens.Spacing.xs)
     }
 
     private var subagentTrailingMeta: some View {
