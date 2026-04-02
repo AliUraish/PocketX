@@ -6,7 +6,6 @@
 import SwiftUI
 
 struct SidebarFloatingSettingsButton: View {
-    let colorScheme: ColorScheme
     let action: () -> Void
 
     var body: some View {
@@ -16,7 +15,7 @@ struct SidebarFloatingSettingsButton: View {
         }) {
             Image(systemName: "gearshape.fill")
                 .font(AppFont.system(size: 17, weight: .semibold))
-                .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
+                .foregroundStyle(.primary)
                 .frame(width: 44, height: 44)
                 .adaptiveGlass(.regular, in: Circle())
         }
@@ -34,12 +33,12 @@ struct SidebarMacConnectionStatusView: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: 2) {
             Text(statusTitle)
-                .font(AppFont.mono(.caption))
+                .font(AppFont.caption())
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
             Text(name)
-                .font(AppFont.mono(.subheadline))
+                .font(AppFont.subheadline())
                 .foregroundStyle(.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
