@@ -99,6 +99,10 @@ extension CodexService {
 
         state.messages = rawMessages
         state.messageRevision = revision
+        state.projectedTimelineCache = ThreadProjectedTimelineCacheEntry(
+            messageRevision: revision,
+            projectedMessages: projectedMessages
+        )
         state.renderSnapshot = TurnTimelineRenderSnapshot(
             threadID: threadId,
             messages: projectedMessages,
@@ -2414,6 +2418,26 @@ extension CodexService {
         return latestAssistantText
     }
 
+// Reuses the reducer output when only thread status/health changed and the raw timeline did not.
+func projectedTimelineMessages(
+    for state: ThreadTimelineState,
+    messages: [CodexMessage],
+    revision: Int
+) -> [CodexMessage] {
+    if let cached = state.projectedTimelineCache,
+       cached.messageRevision == revision {
+        return cached.projectedMessages
+    }
+
+    let projectedMessages = TurnTimelineReducer.project(messages: messages).messages
+    state.projectedTimelineCache = ThreadProjectedTimelineCacheEntry(
+        messageRevision: revision,
+        projectedMessages: projectedMessages
+    )
+    return projectedMessages
+}
+
+
     // Rebuilds one thread's render snapshot from service-owned caches after any timeline mutation.
     func refreshThreadTimelineState(for threadId: String) {
         let state = timelineState(for: threadId)
@@ -2423,7 +2447,11 @@ extension CodexService {
         let isThreadRunning = activeTurnID != nil || runningThreadIDs.contains(threadId)
         let stoppedTurnIDs = rebuildStoppedTurnIDs(for: threadId, messages: messages)
         let latestTurnTerminalState = latestTurnTerminalStateByThread[threadId]
-        let projectedMessages = TurnTimelineReducer.project(messages: messages).messages
+        let projectedMessages = projectedTimelineMessages(
+            for: state,
+            messages: messages,
+            revision: revision
+        )
         let repoRefreshSignal = buildRepoRefreshSignal(for: messages)
         latestRepoAffectingMessageSignalByThread[threadId] = repoRefreshSignal
         let assistantRevertStates = assistantRevertStates(
