@@ -166,7 +166,7 @@ final class TurnViewModel {
     var gitLocalCheckoutPath: String?
     var gitDefaultBranch = ""
     var gitRepoSync: GitRepoSyncResult? = nil
-    var gitSyncState: String? { gitRepoSync?.state }
+    var gitSyncState: GitSyncState? { gitRepoSync?.syncState }
     // Keeps PR creation tied to live Git state instead of chat-local remembered branch state.
     var createPullRequestValidationMessage: String? {
         guard let repoSync = gitRepoSync else {
@@ -201,8 +201,11 @@ final class TurnViewModel {
     var canCreatePullRequest: Bool { createPullRequestValidationMessage == nil }
     var shouldShowDiscardRuntimeChangesAndSync: Bool {
         guard let sync = gitRepoSync else { return false }
-        let dangerousStates = ["dirty", "dirty_and_behind", "diverged"]
-        return dangerousStates.contains(sync.state) || (sync.isDirty && sync.state == "no_upstream")
+        switch sync.syncState {
+        case .dirty, .dirtyAndBehind, .diverged: return true
+        case .noUpstream: return sync.isDirty
+        case .none, .upToDate, .aheadOnly, .behindOnly, .detachedHead: return false
+        }
     }
 
     // Keeps git mutations scoped to an idle, explicitly bound local repo.
@@ -2000,15 +2003,15 @@ final class TurnViewModel {
                 case .syncNow:
                     let result = try await gitService.status()
                     applyGitRepoSync(result)
-                    if result.state == "behind_only" {
+                    if result.syncState == .behindOnly {
                         let pullResult = try await gitService.pull()
                         if let status = pullResult.status {
                             applyGitRepoSync(status)
                         }
-                    } else if result.state == "diverged" || result.state == "dirty_and_behind" {
+                    } else if result.syncState == .diverged || result.syncState == .dirtyAndBehind {
                         gitSyncAlert = TurnGitSyncAlert(
-                            title: result.state == "diverged" ? "Branch diverged from remote" : "Local changes need attention",
-                            message: result.state == "diverged"
+                            title: result.syncState == .diverged ? "Branch diverged from remote" : "Local changes need attention",
+                            message: result.syncState == .diverged
                                 ? "Local and remote history both moved. Pull with rebase to reconcile them?"
                                 : "You have local changes and the remote branch moved ahead. Pull with rebase only if you're ready to reconcile those changes.",
                             action: .pullRebase
