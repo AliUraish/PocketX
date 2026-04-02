@@ -26,7 +26,7 @@ struct TurnToolbarContent: ToolbarContent {
     let disabledGitActions: Set<TurnGitActionKind>
     let isRunningGitAction: Bool
     let showsDiscardRuntimeChangesAndSync: Bool
-    let gitSyncState: String?
+    let gitSyncState: GitSyncState?
     var onTapMacHandoff: (() -> Void)?
     var onTapWorktreeHandoff: (() -> Void)?
     var onTapNewChat: (() -> Void)?
