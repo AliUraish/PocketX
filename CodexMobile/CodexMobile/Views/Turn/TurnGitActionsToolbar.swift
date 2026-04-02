@@ -55,15 +55,15 @@ struct TurnGitActionsToolbarButton: View {
     let disabledActions: Set<TurnGitActionKind>
     let isRunningAction: Bool
     let showsDiscardRuntimeChangesAndSync: Bool
-    let gitSyncState: String?
+    let gitSyncState: GitSyncState?
     let onSelect: (TurnGitActionKind) -> Void
 
     private let minToolbarButtonSize: CGFloat = 28
 
     private var syncStatusColor: Color? {
         switch gitSyncState {
-        case "behind_only", "diverged", "dirty_and_behind":
-            return Color.orange
+        case .behindOnly, .diverged, .dirtyAndBehind:
+            return DesignTokens.Colors.gitSyncWarning
         default:
             return nil
         }
@@ -71,23 +71,23 @@ struct TurnGitActionsToolbarButton: View {
 
     private var syncStatusAccessibilityValue: String? {
         switch gitSyncState {
-        case "up_to_date":
+        case .upToDate:
             return "Repository up to date"
-        case "ahead_only":
+        case .aheadOnly:
             return "Local branch ahead of remote"
-        case "behind_only":
+        case .behindOnly:
             return "Remote branch ahead of local branch"
-        case "diverged":
+        case .diverged:
             return "Local and remote branches diverged"
-        case "dirty":
+        case .dirty:
             return "Local repository has uncommitted changes"
-        case "dirty_and_behind":
+        case .dirtyAndBehind:
             return "Local changes exist and remote branch moved ahead"
-        case "no_upstream":
+        case .noUpstream:
             return "Branch not published yet"
-        case "detached_head":
+        case .detachedHead:
             return "Current branch unavailable"
-        default:
+        case nil:
             return nil
         }
     }
