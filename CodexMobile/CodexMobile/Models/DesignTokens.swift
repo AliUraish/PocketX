@@ -32,6 +32,9 @@ enum DesignTokens {
         static let archiveBadgeForeground = Color.orange
         static let archiveBadgeBackground = Color.orange.opacity(0.12)
 
+        // Icon button (e.g. project group "+" button)
+        static let iconButtonBackground = Color.primary.opacity(0.08)
+
         // Git sync status indicator
         static let gitSyncWarning = Color.orange
     }
