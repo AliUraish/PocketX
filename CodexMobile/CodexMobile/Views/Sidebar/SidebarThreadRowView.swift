@@ -87,6 +87,17 @@ struct SidebarThreadRowView: View, Equatable {
         .buttonStyle(.plain)
         .padding(.horizontal, DesignTokens.Spacing.md)
         .padding(.vertical, DesignTokens.Spacing.md)
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(runBadgeAccessibilityText)
+    }
+
+    private var runBadgeAccessibilityText: String {
+        switch runBadgeState {
+        case .running: return "Running"
+        case .ready: return "Answer ready"
+        case .failed: return "Failed"
+        case nil: return ""
+        }
     }
 
     private var parentTrailingMeta: some View {
@@ -100,9 +111,14 @@ struct SidebarThreadRowView: View, Equatable {
                     .background(DesignTokens.Colors.archiveBadgeBackground, in: Capsule())
             }
 
-            if let diffTotals {
-                SidebarThreadDiffTotalsLabel(totals: diffTotals)
+            Group {
+                if let diffTotals {
+                    SidebarThreadDiffTotalsLabel(totals: diffTotals)
+                } else {
+                    Color.clear
+                }
             }
+            .frame(minWidth: 44)
 
             expansionToggleButton
 
