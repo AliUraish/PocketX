@@ -72,7 +72,7 @@ struct ContentView: View {
             }
             .onChange(of: codex.activeThreadId) { _, activeThreadId in
                 guard let activeThreadId,
-                      let matchingThread = codex.threads.first(where: { $0.id == activeThreadId }),
+                      let matchingThread = codex.thread(for: activeThreadId),
                       selectedThread?.id != matchingThread.id else {
                     return
                 }
@@ -665,8 +665,10 @@ struct ContentView: View {
         }
 
         if let selected = selectedThread,
-           let refreshed = threads.first(where: { $0.id == selected.id }) {
-            selectedThread = refreshed
+           let refreshed = codex.thread(for: selected.id) {
+            if refreshed != selected {
+                selectedThread = refreshed
+            }
             return
         }
 
