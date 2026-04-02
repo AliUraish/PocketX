@@ -8,7 +8,6 @@ import SwiftUI
 
 struct SidebarView: View {
     @Environment(CodexService.self) private var codex
-    @Environment(\.colorScheme) private var colorScheme
 
     @Binding var selectedThread: CodexThread?
     @Binding var showSettings: Bool
@@ -93,7 +92,7 @@ struct SidebarView: View {
             }
 
             HStack(spacing: 10) {
-                SidebarFloatingSettingsButton(colorScheme: colorScheme, action: openSettings)
+                SidebarFloatingSettingsButton(action: openSettings)
                 Spacer(minLength: 0)
                 if let trustedPairPresentation = codex.trustedPairPresentation {
                     SidebarMacConnectionStatusView(
