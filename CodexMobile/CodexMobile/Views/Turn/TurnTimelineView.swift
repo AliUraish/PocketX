@@ -42,7 +42,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
     private let scrollBottomAnchorID = "turn-scroll-bottom-anchor"
     /// Number of messages to show per page.  Only the tail slice is rendered;
     /// scrolling to the top reveals a "Load earlier messages" button.
-    private static var pageSize: Int { 40 }
+    private static var pageSize: Int { 28 }
 
     @State private var visibleTailCount: Int = pageSize
     @State private var viewportHeight: CGFloat = 0
