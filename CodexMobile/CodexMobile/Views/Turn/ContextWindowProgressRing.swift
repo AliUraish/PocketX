@@ -93,7 +93,7 @@ struct ContextWindowProgressRing: View {
         switch usage.fractionUsed {
         case 0.85...: return .red
         case 0.65..<0.85: return .orange
-        default: return Color(.systemGray2)
+        default: return .white
         }
     }
 
