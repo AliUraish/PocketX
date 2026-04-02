@@ -196,6 +196,53 @@ private struct CodeCommentFindingCard: View {
     }
 }
 
+@MainActor
+private enum TurnAttachmentImageCache {
+    private static let thumbnailCache = BoundedCache<String, UIImage>(maxEntries: 192)
+    private static let previewCache = BoundedCache<String, UIImage>(maxEntries: 96)
+
+    static func thumbnail(for attachment: CodexImageAttachment) -> UIImage? {
+        guard !attachment.thumbnailBase64JPEG.isEmpty else {
+            return nil
+        }
+        let key = TurnTextCacheKey.key(namespace: "attachment-thumb", text: attachment.thumbnailBase64JPEG)
+        return thumbnailCache.getOrSet(key) {
+            guard let data = Data(base64Encoded: attachment.thumbnailBase64JPEG) else {
+                return UIImage()
+            }
+            return UIImage(data: data) ?? UIImage()
+        }.nonEmptyImage
+    }
+
+    static func preview(for attachment: CodexImageAttachment) -> UIImage? {
+        let previewSource = attachment.payloadDataURL ?? attachment.thumbnailBase64JPEG
+        guard !previewSource.isEmpty else {
+            return nil
+        }
+        let key = TurnTextCacheKey.key(namespace: "attachment-preview", text: previewSource)
+        return previewCache.getOrSet(key) {
+            if let payloadDataURL = attachment.payloadDataURL,
+               let imageData = AttachmentPreviewImageResolver.decodeImageDataFromDataURL(payloadDataURL),
+               let image = UIImage(data: imageData) {
+                return image
+            }
+
+            guard !attachment.thumbnailBase64JPEG.isEmpty,
+                  let thumbnailData = Data(base64Encoded: attachment.thumbnailBase64JPEG),
+                  let image = UIImage(data: thumbnailData) else {
+                return UIImage()
+            }
+            return image
+        }.nonEmptyImage
+    }
+}
+
+private extension UIImage {
+    var nonEmptyImage: UIImage? {
+        size == .zero ? nil : self
+    }
+}
+
 enum MarkdownTextFormatter {
     // Applies lightweight markdown cleanup and turns file paths into link-styled labels.
     static func renderableText(from raw: String, profile: MarkdownRenderProfile) -> String {
@@ -498,11 +545,7 @@ private struct UserAttachmentThumbnailView: View {
     }
 
     private var thumbnailUIImage: UIImage? {
-        guard !attachment.thumbnailBase64JPEG.isEmpty,
-              let data = Data(base64Encoded: attachment.thumbnailBase64JPEG) else {
-            return nil
-        }
-        return UIImage(data: data)
+        TurnAttachmentImageCache.thumbnail(for: attachment)
     }
 }
 
@@ -529,20 +572,10 @@ private struct UserAttachmentStrip: View {
 private enum AttachmentPreviewImageResolver {
     // Uses full payload data URL first, then falls back to thumbnail for resilience.
     static func resolve(_ attachment: CodexImageAttachment) -> UIImage? {
-        if let payloadDataURL = attachment.payloadDataURL,
-           let imageData = decodeImageDataFromDataURL(payloadDataURL),
-           let image = UIImage(data: imageData) {
-            return image
-        }
-
-        guard !attachment.thumbnailBase64JPEG.isEmpty,
-              let thumbnailData = Data(base64Encoded: attachment.thumbnailBase64JPEG) else {
-            return nil
-        }
-        return UIImage(data: thumbnailData)
+        TurnAttachmentImageCache.preview(for: attachment)
     }
 
-    private static func decodeImageDataFromDataURL(_ dataURL: String) -> Data? {
+    static func decodeImageDataFromDataURL(_ dataURL: String) -> Data? {
         guard let commaIndex = dataURL.firstIndex(of: ",") else {
             return nil
         }
