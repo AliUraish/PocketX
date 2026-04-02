@@ -7,6 +7,118 @@
 import Foundation
 import UIKit
 
+private struct HistoryMergeLookup {
+    private var assistantByTurnAndText: [String: [Int]] = [:]
+    private var assistantByTurn: [String: [Int]] = [:]
+    private var assistantStreamingByTurn: [String: [Int]] = [:]
+    private var userByText: [String: [Int]] = [:]
+    private var pendingUserByText: [String: [Int]] = [:]
+    private var systemByKindAndTurn: [String: [Int]] = [:]
+    private var toolActivityByTurn: [String: [Int]] = [:]
+    private var commandByTurnAndPreview: [String: [Int]] = [:]
+    private var historyKeyToIndices: [String: [Int]] = [:]
+
+    init(messages: [CodexMessage]) {
+        for (index, message) in messages.enumerated() {
+            record(index: index, message: message)
+        }
+    }
+
+    mutating func record(index: Int, message: CodexMessage) {
+        Self.append(index, key: CodexService.historyMessageKey(for: message), to: &historyKeyToIndices)
+
+        switch message.role {
+        case .assistant:
+            guard let turnId = Self.normalizedTurnID(message.turnId) else { break }
+            Self.append(index, key: turnId, to: &assistantByTurn)
+            let normalizedText = CodexService.normalizedMessageText(message.text)
+            if !normalizedText.isEmpty {
+                Self.append(index, key: Self.assistantTurnTextKey(turnId: turnId, text: normalizedText), to: &assistantByTurnAndText)
+            }
+            if message.isStreaming {
+                Self.append(index, key: turnId, to: &assistantStreamingByTurn)
+            }
+
+        case .user:
+            let textKey = CodexService.normalizedMessageText(message.text)
+            Self.append(index, key: textKey, to: &userByText)
+            if message.deliveryState == .pending {
+                Self.append(index, key: textKey, to: &pendingUserByText)
+            }
+
+        case .system:
+            guard let turnId = Self.normalizedTurnID(message.turnId) else { break }
+            Self.append(index, key: Self.systemTurnKey(kind: message.kind, turnId: turnId), to: &systemByKindAndTurn)
+            if message.kind == .toolActivity {
+                Self.append(index, key: turnId, to: &toolActivityByTurn)
+            }
+            if message.kind == .commandExecution,
+               let previewKey = CodexService.normalizedCommandExecutionPreviewKey(from: message.text) {
+                Self.append(index, key: Self.commandPreviewKey(turnId: turnId, preview: previewKey), to: &commandByTurnAndPreview)
+            }
+        }
+    }
+
+    func assistantTurnTextCandidates(turnId: String, text: String) -> [Int] {
+        assistantByTurnAndText[Self.assistantTurnTextKey(turnId: turnId, text: CodexService.normalizedMessageText(text))] ?? []
+    }
+
+    func assistantTurnCandidates(turnId: String) -> [Int] {
+        assistantByTurn[turnId] ?? []
+    }
+
+    func assistantStreamingCandidates(turnId: String) -> [Int] {
+        assistantStreamingByTurn[turnId] ?? []
+    }
+
+    func userCandidates(text: String) -> [Int] {
+        userByText[CodexService.normalizedMessageText(text)] ?? []
+    }
+
+    func pendingUserCandidates(text: String) -> [Int] {
+        pendingUserByText[CodexService.normalizedMessageText(text)] ?? []
+    }
+
+    func systemCandidates(kind: CodexMessageKind, turnId: String) -> [Int] {
+        systemByKindAndTurn[Self.systemTurnKey(kind: kind, turnId: turnId)] ?? []
+    }
+
+    func toolActivityCandidates(turnId: String) -> [Int] {
+        toolActivityByTurn[turnId] ?? []
+    }
+
+    func commandCandidates(turnId: String, commandPreview: String) -> [Int] {
+        commandByTurnAndPreview[Self.commandPreviewKey(turnId: turnId, preview: commandPreview)] ?? []
+    }
+
+    func historyKeyCandidates(_ key: String) -> [Int] {
+        historyKeyToIndices[key] ?? []
+    }
+
+    private static func append(_ index: Int, key: String, to storage: inout [String: [Int]]) {
+        if storage[key]?.last == index {
+            return
+        }
+        storage[key, default: []].append(index)
+    }
+
+    private static func normalizedTurnID(_ turnId: String?) -> String? {
+        CodexService.normalizedHistoryIdentifier(turnId)
+    }
+
+    private static func assistantTurnTextKey(turnId: String, text: String) -> String {
+        "\(turnId)|\(text)"
+    }
+
+    private static func systemTurnKey(kind: CodexMessageKind, turnId: String) -> String {
+        "\(kind.rawValue)|\(turnId)"
+    }
+
+    private static func commandPreviewKey(turnId: String, preview: String) -> String {
+        "\(turnId)|\(preview)"
+    }
+}
+
 extension CodexService {
     // Decodes thread/read(includeTurns=true) payload into chronological message timeline.
     func decodeMessagesFromThreadRead(threadId: String, threadObject: [String: JSONValue]) -> [CodexMessage] {
@@ -377,232 +489,243 @@ extension CodexService {
         return Self.mergeHistoryMessages(existing, history, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningIDs)
     }
 
-    nonisolated static func mergeHistoryMessages(
-        _ existing: [CodexMessage],
-        _ history: [CodexMessage],
-        activeThreadIDs: Set<String>,
-        runningThreadIDs: Set<String>
-    ) -> [CodexMessage] {
-        if existing.isEmpty {
-            // History messages arrive in server order; assign sequential orderIndex values
-            // so that the stable sort preserves server-provided chronology.
-            var sorted = history.sorted(by: { $0.createdAt < $1.createdAt })
-            for index in sorted.indices {
-                sorted[index].orderIndex = CodexMessageOrderCounter.next()
-            }
-            return sorted
+nonisolated static func mergeHistoryMessages(
+    _ existing: [CodexMessage],
+    _ history: [CodexMessage],
+    activeThreadIDs: Set<String>,
+    runningThreadIDs: Set<String>
+) -> [CodexMessage] {
+    if existing.isEmpty {
+        var sorted = history.sorted(by: { $0.createdAt < $1.createdAt })
+        for index in sorted.indices {
+            sorted[index].orderIndex = CodexMessageOrderCounter.next()
         }
-
-        var merged = existing
-
-        for message in history {
-            if message.role == .assistant,
-               let turnId = message.turnId, !turnId.isEmpty,
-               let index = merged.lastIndex(where: { candidate in
-                   candidate.role == .assistant
-                       && candidate.turnId == turnId
-                       && normalizedMessageText(candidate.text) == normalizedMessageText(message.text)
-               }) {
-                merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                continue
-            }
-
-            // Fallback: match assistant by turnId alone when text-based matching missed
-            // (e.g. history arrives while streaming is in progress, or itemId mismatch).
-            if message.role == .assistant,
-               let turnId = message.turnId, !turnId.isEmpty,
-               let incomingItemId = normalizedHistoryIdentifier(message.itemId),
-               let index = merged.lastIndex(where: { candidate in
-                   candidate.role == .assistant
-                       && candidate.turnId == turnId
-                       && (normalizedHistoryIdentifier(candidate.itemId) == nil
-                           || normalizedHistoryIdentifier(candidate.itemId) == incomingItemId)
-               }) {
-                merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                continue
-            }
-
-            // Legacy fallback for servers that still omit assistant item ids in history snapshots.
-            if message.role == .assistant,
-               let turnId = message.turnId, !turnId.isEmpty,
-               normalizedHistoryIdentifier(message.itemId) == nil,
-               let index = merged.lastIndex(where: { candidate in
-                   candidate.role == .assistant
-                       && candidate.turnId == turnId
-                       && normalizedHistoryIdentifier(candidate.itemId) == nil
-               }) {
-                merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                continue
-            }
-
-            // Forced resume snapshots can materialize a real assistant itemId after the
-            // live row was already created with a placeholder/stale identity. When the
-            // turn is still active, prefer merging into the streaming row instead of
-            // appending a second assistant bubble for the same response.
-            if message.role == .assistant,
-               let turnId = message.turnId, !turnId.isEmpty,
-               (activeThreadIDs.contains(message.threadId) || runningThreadIDs.contains(message.threadId)),
-               let index = merged.lastIndex(where: { candidate in
-                   candidate.role == .assistant
-                       && candidate.turnId == turnId
-                       && candidate.isStreaming
-               }) {
-                merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                continue
-            }
-
-            if message.role == .user,
-               let turnId = message.turnId, !turnId.isEmpty,
-               let index = merged.lastIndex(where: { candidate in
-                   candidate.role == .user
-                       && candidate.deliveryState != .failed
-                       && normalizedMessageText(candidate.text) == normalizedMessageText(message.text)
-                       && userMessageAttachmentsLikelyMatch(
-                           candidate.attachments,
-                           message.attachments
-                       )
-                       && (candidate.turnId == nil || candidate.turnId == turnId)
-               }) {
-                merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                continue
-            }
-
-            // Reconcile turn-scoped thinking snapshots even when the streamed row
-            // carries a synthetic itemId (e.g. "turn:ABC|kind:thinking") that differs
-            // from the server's real itemId or nil.
-            if message.role == .system,
-               message.kind == .thinking,
-               let turnId = message.turnId, !turnId.isEmpty,
-               let index = merged.lastIndex(where: { candidate in
-                   candidate.role == .system
-                       && candidate.kind == .thinking
-                       && candidate.turnId == turnId
-               }) {
-                merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                continue
-            }
-
-            // Reconcile turn-scoped file change items even when the streamed row
-            // has a synthetic itemId that differs from the server's real one.
-            if message.role == .system,
-               message.kind == .fileChange,
-               let turnId = message.turnId, !turnId.isEmpty,
-               let index = merged.lastIndex(where: { candidate in
-                   candidate.role == .system
-                       && candidate.kind == .fileChange
-                       && (candidate.turnId == nil || candidate.turnId == turnId)
-               }) {
-                merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                continue
-            }
-
-            // Rebind generic tool rows when a live synthetic row gets a real history item id later.
-            if message.role == .system,
-               message.kind == .toolActivity,
-               let turnId = message.turnId, !turnId.isEmpty {
-                let candidateIndices = merged.indices.filter { index in
-                    let candidate = merged[index]
-                    return candidate.role == .system
-                        && candidate.kind == .toolActivity
-                        && candidate.turnId == turnId
-                }
-
-                if let itemIndex = candidateIndices.last(where: { index in
-                    let candidateItemId = normalizedHistoryIdentifier(merged[index].itemId)
-                    let incomingItemId = normalizedHistoryIdentifier(message.itemId)
-                    return candidateItemId != nil && candidateItemId == incomingItemId
-                }) {
-                    merged[itemIndex] = reconcileExistingMessage(merged[itemIndex], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                    continue
-                }
-
-                if candidateIndices.count == 1,
-                   let index = candidateIndices.last,
-                   isProvisionalToolActivityRow(merged[index]),
-                   shouldReconcileToolActivityRow(
-                    merged[index],
-                    with: message,
-                    requiresExactText: false
-                   ) {
-                    merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                    continue
-                }
-
-                if candidateIndices.count > 1 {
-                    let reconcilableIndices = candidateIndices.filter { index in
-                        shouldReconcileToolActivityRow(
-                            merged[index],
-                            with: message,
-                            requiresExactText: true
-                        )
-                    }
-
-                    if reconcilableIndices.count == 1,
-                       let index = reconcilableIndices.last {
-                        merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                        continue
-                    }
-                }
-            }
-
-            // Dedupes command rows when incoming/history command formatting differs only by shell quoting.
-            if message.role == .system,
-               message.kind == .commandExecution,
-               let turnId = message.turnId, !turnId.isEmpty,
-               let incomingCommandKey = normalizedCommandExecutionPreviewKey(from: message.text),
-               let index = merged.lastIndex(where: { candidate in
-                   guard candidate.role == .system,
-                         candidate.kind == .commandExecution,
-                         candidate.turnId == turnId,
-                         let candidateCommandKey = normalizedCommandExecutionPreviewKey(from: candidate.text) else {
-                       return false
-                   }
-                   return candidateCommandKey == incomingCommandKey
-               }) {
-                merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                continue
-            }
-
-            // Reconcile turn-scoped command execution items by turnId when text-based
-            // dedup above did not match (e.g. synthetic vs real itemId).
-            if message.role == .system,
-               message.kind == .commandExecution,
-               let turnId = message.turnId, !turnId.isEmpty,
-               let index = merged.lastIndex(where: { candidate in
-                   candidate.role == .system
-                       && candidate.kind == .commandExecution
-                       && candidate.turnId == turnId
-               }) {
-                merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                continue
-            }
-
-            let key = historyMessageKey(for: message)
-            if let index = merged.firstIndex(where: { historyMessageKey(for: $0) == key }) {
-                merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                continue
-            }
-
-            if message.role == .user,
-               let pendingIndex = merged.lastIndex(where: { candidate in
-                   candidate.role == .user
-                       && candidate.deliveryState == .pending
-                       && normalizedMessageText(candidate.text) == normalizedMessageText(message.text)
-                       && userMessageAttachmentsLikelyMatch(
-                           candidate.attachments,
-                           message.attachments
-                       )
-               }) {
-                merged[pendingIndex] = reconcileExistingMessage(merged[pendingIndex], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
-                continue
-            }
-
-            merged.append(message)
-        }
-
-        merged.sort(by: { $0.orderIndex < $1.orderIndex })
-        return merged
+        return sorted
     }
+
+    var merged = existing
+    var lookup = HistoryMergeLookup(messages: existing)
+
+    for message in history {
+        if message.role == .assistant,
+           let turnId = normalizedHistoryIdentifier(message.turnId),
+           let index = lookup.assistantTurnTextCandidates(turnId: turnId, text: message.text)
+            .reversed()
+            .first(where: { candidateIndex in
+                let candidate = merged[candidateIndex]
+                return candidate.role == .assistant
+                    && candidate.turnId == turnId
+                    && normalizedMessageText(candidate.text) == normalizedMessageText(message.text)
+            }) {
+            merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+            lookup.record(index: index, message: merged[index])
+            continue
+        }
+
+        if message.role == .assistant,
+           let turnId = normalizedHistoryIdentifier(message.turnId),
+           let incomingItemId = normalizedHistoryIdentifier(message.itemId),
+           let index = lookup.assistantTurnCandidates(turnId: turnId)
+            .reversed()
+            .first(where: { candidateIndex in
+                let candidate = merged[candidateIndex]
+                return candidate.role == .assistant
+                    && candidate.turnId == turnId
+                    && (normalizedHistoryIdentifier(candidate.itemId) == nil
+                        || normalizedHistoryIdentifier(candidate.itemId) == incomingItemId)
+            }) {
+            merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+            lookup.record(index: index, message: merged[index])
+            continue
+        }
+
+        if message.role == .assistant,
+           let turnId = normalizedHistoryIdentifier(message.turnId),
+           normalizedHistoryIdentifier(message.itemId) == nil,
+           let index = lookup.assistantTurnCandidates(turnId: turnId)
+            .reversed()
+            .first(where: { candidateIndex in
+                let candidate = merged[candidateIndex]
+                return candidate.role == .assistant
+                    && candidate.turnId == turnId
+                    && normalizedHistoryIdentifier(candidate.itemId) == nil
+            }) {
+            merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+            lookup.record(index: index, message: merged[index])
+            continue
+        }
+
+        if message.role == .assistant,
+           let turnId = normalizedHistoryIdentifier(message.turnId),
+           (activeThreadIDs.contains(message.threadId) || runningThreadIDs.contains(message.threadId)),
+           let index = lookup.assistantStreamingCandidates(turnId: turnId)
+            .reversed()
+            .first(where: { candidateIndex in
+                let candidate = merged[candidateIndex]
+                return candidate.role == .assistant
+                    && candidate.turnId == turnId
+                    && candidate.isStreaming
+            }) {
+            merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+            lookup.record(index: index, message: merged[index])
+            continue
+        }
+
+        if message.role == .user,
+           let turnId = normalizedHistoryIdentifier(message.turnId),
+           let index = lookup.userCandidates(text: message.text)
+            .reversed()
+            .first(where: { candidateIndex in
+                let candidate = merged[candidateIndex]
+                return candidate.role == .user
+                    && candidate.deliveryState != .failed
+                    && normalizedMessageText(candidate.text) == normalizedMessageText(message.text)
+                    && userMessageAttachmentsLikelyMatch(candidate.attachments, message.attachments)
+                    && (candidate.turnId == nil || candidate.turnId == turnId)
+            }) {
+            merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+            lookup.record(index: index, message: merged[index])
+            continue
+        }
+
+        if message.role == .system,
+           message.kind == .thinking,
+           let turnId = normalizedHistoryIdentifier(message.turnId),
+           let index = lookup.systemCandidates(kind: .thinking, turnId: turnId)
+            .reversed()
+            .first(where: { candidateIndex in
+                let candidate = merged[candidateIndex]
+                return candidate.role == .system
+                    && candidate.kind == .thinking
+                    && candidate.turnId == turnId
+            }) {
+            merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+            lookup.record(index: index, message: merged[index])
+            continue
+        }
+
+        if message.role == .system,
+           message.kind == .fileChange,
+           let turnId = normalizedHistoryIdentifier(message.turnId),
+           let index = lookup.systemCandidates(kind: .fileChange, turnId: turnId)
+            .reversed()
+            .first(where: { candidateIndex in
+                let candidate = merged[candidateIndex]
+                return candidate.role == .system
+                    && candidate.kind == .fileChange
+                    && (candidate.turnId == nil || candidate.turnId == turnId)
+            }) {
+            merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+            lookup.record(index: index, message: merged[index])
+            continue
+        }
+
+        if message.role == .system,
+           message.kind == .toolActivity,
+           let turnId = normalizedHistoryIdentifier(message.turnId) {
+            let candidateIndices = lookup.toolActivityCandidates(turnId: turnId)
+
+            if let itemIndex = candidateIndices.reversed().first(where: { candidateIndex in
+                let candidateItemId = normalizedHistoryIdentifier(merged[candidateIndex].itemId)
+                let incomingItemId = normalizedHistoryIdentifier(message.itemId)
+                return candidateItemId != nil && candidateItemId == incomingItemId
+            }) {
+                merged[itemIndex] = reconcileExistingMessage(merged[itemIndex], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+                lookup.record(index: itemIndex, message: merged[itemIndex])
+                continue
+            }
+
+            if candidateIndices.count == 1,
+               let index = candidateIndices.last,
+               isProvisionalToolActivityRow(merged[index]),
+               shouldReconcileToolActivityRow(merged[index], with: message, requiresExactText: false) {
+                merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+                lookup.record(index: index, message: merged[index])
+                continue
+            }
+
+            if candidateIndices.count > 1 {
+                let reconcilableIndices = candidateIndices.filter { candidateIndex in
+                    shouldReconcileToolActivityRow(merged[candidateIndex], with: message, requiresExactText: true)
+                }
+
+                if reconcilableIndices.count == 1,
+                   let index = reconcilableIndices.last {
+                    merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+                    lookup.record(index: index, message: merged[index])
+                    continue
+                }
+            }
+        }
+
+        if message.role == .system,
+           message.kind == .commandExecution,
+           let turnId = normalizedHistoryIdentifier(message.turnId),
+           let incomingCommandKey = normalizedCommandExecutionPreviewKey(from: message.text),
+           let index = lookup.commandCandidates(turnId: turnId, commandPreview: incomingCommandKey)
+            .reversed()
+            .first(where: { candidateIndex in
+                let candidate = merged[candidateIndex]
+                guard candidate.role == .system,
+                      candidate.kind == .commandExecution,
+                      candidate.turnId == turnId,
+                      let candidateCommandKey = normalizedCommandExecutionPreviewKey(from: candidate.text) else {
+                    return false
+                }
+                return candidateCommandKey == incomingCommandKey
+            }) {
+            merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+            lookup.record(index: index, message: merged[index])
+            continue
+        }
+
+        if message.role == .system,
+           message.kind == .commandExecution,
+           let turnId = normalizedHistoryIdentifier(message.turnId),
+           let index = lookup.systemCandidates(kind: .commandExecution, turnId: turnId)
+            .reversed()
+            .first(where: { candidateIndex in
+                let candidate = merged[candidateIndex]
+                return candidate.role == .system
+                    && candidate.kind == .commandExecution
+                    && candidate.turnId == turnId
+            }) {
+            merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+            lookup.record(index: index, message: merged[index])
+            continue
+        }
+
+        let key = historyMessageKey(for: message)
+        if let index = lookup.historyKeyCandidates(key)
+            .first(where: { candidateIndex in historyMessageKey(for: merged[candidateIndex]) == key }) {
+            merged[index] = reconcileExistingMessage(merged[index], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+            lookup.record(index: index, message: merged[index])
+            continue
+        }
+
+        if message.role == .user,
+           let pendingIndex = lookup.pendingUserCandidates(text: message.text)
+            .reversed()
+            .first(where: { candidateIndex in
+                let candidate = merged[candidateIndex]
+                return candidate.role == .user
+                    && candidate.deliveryState == .pending
+                    && normalizedMessageText(candidate.text) == normalizedMessageText(message.text)
+                    && userMessageAttachmentsLikelyMatch(candidate.attachments, message.attachments)
+            }) {
+            merged[pendingIndex] = reconcileExistingMessage(merged[pendingIndex], with: message, activeThreadIDs: activeThreadIDs, runningThreadIDs: runningThreadIDs)
+            lookup.record(index: pendingIndex, message: merged[pendingIndex])
+            continue
+        }
+
+        merged.append(message)
+        lookup.record(index: merged.endIndex - 1, message: message)
+    }
+
+    merged.sort(by: { $0.orderIndex < $1.orderIndex })
+    return merged
+}
+
 
     func decodeHistoryTimestamp(from object: [String: JSONValue]) -> Date? {
         let numericKeys = [
