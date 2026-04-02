@@ -323,6 +323,7 @@ struct SidebarThreadListView: View {
             onArchiveToggle: onArchiveToggleThread.map { handler in { handler(thread) } },
             onDelete: onDeleteThread.map { handler in { handler(thread) } }
         )
+        .equatable()
     }
 
     // Preloads metadata only for subagent rows that are currently reachable in the sidebar tree.
