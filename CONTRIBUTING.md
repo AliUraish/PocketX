@@ -1,4 +1,4 @@
-# Contributing to Remodex
+# Contributing to Pocketex
 
 I am not actively accepting contributions right now.
 
@@ -41,17 +41,17 @@ Opening a PR does not create an obligation on my side. I may close it. I may ign
 - **[Codex desktop app](https://openai.com/index/codex/)** (optional — for viewing threads on Mac)
 - **macOS** (required for desktop refresh; core bridge works on any OS)
 - **Xcode 16+** (only for building the iOS app)
-- **iPhone** with the Remodex app (or built from source)
+- **iPhone** with the Pocketex app (or built from source)
 
 ### Bridge setup
 
 ```sh
 # Clone the repo
-git clone https://github.com/Emanuele-web04/remodex.git
-cd remodex
+git clone https://github.com/Emanuele-web04/pocketex.git
+cd pocketex
 
 # Start a local relay + bridge together
-./run-local-remodex.sh
+./run-local-pocketex.sh
 ```
 
 This launcher:
@@ -65,16 +65,16 @@ If you only want the bridge process:
 ```sh
 cd phodex-bridge
 npm install
-REMODEX_RELAY="ws://localhost:9000/relay" npm start
+POCKETEX_RELAY="ws://localhost:9000/relay" npm start
 ```
 
-That runs `remodex up`, which:
+That runs `pocketex up`, which:
 1. Spawns a Codex `app-server` process
 2. Connects to the configured relay
 3. On macOS, starts the built-in background bridge service
 4. Prints a QR code in your terminal when first-time pairing or recovery is needed
 
-Scan the QR code with the Remodex iOS app to trust that Mac.
+Scan the QR code with the Pocketex iOS app to trust that Mac.
 
 ### iOS app setup
 
@@ -91,7 +91,7 @@ The app uses SwiftUI and the current project target is iOS 18.6. No CocoaPods or
 
 ### Testing a full local session
 
-1. Start the local launcher: `./run-local-remodex.sh`
+1. Start the local launcher: `./run-local-pocketex.sh`
 2. Open the iOS app and scan the QR code
 3. Create a new thread from the app
 4. Send a message — you should see Codex respond in real-time
@@ -100,32 +100,32 @@ The app uses SwiftUI and the current project target is iOS 18.6. No CocoaPods or
 
 ### Environment variables
 
-For OSS/local development, prefer the launcher above. If you want to point the bridge at your own relay manually, export `REMODEX_RELAY` in your shell:
+For OSS/local development, prefer the launcher above. If you want to point the bridge at your own relay manually, export `POCKETEX_RELAY` in your shell:
 
 ```sh
 # Connect to an existing Codex instance instead of spawning one
-REMODEX_CODEX_ENDPOINT=ws://localhost:8080 npm start
+POCKETEX_CODEX_ENDPOINT=ws://localhost:8080 npm start
 
 # Use your own self-hosted relay endpoint (`ws://` is unencrypted)
-REMODEX_RELAY="ws://localhost:9000/relay" npm start
+POCKETEX_RELAY="ws://localhost:9000/relay" npm start
 
 # Enable auto-refresh of Codex.app on Mac
-REMODEX_REFRESH_ENABLED=true npm start
+POCKETEX_REFRESH_ENABLED=true npm start
 ```
 
 ### Project structure
 
 ```
-remodex/
+pocketex/
 ├── phodex-bridge/          # Node.js CLI bridge (npm package)
-│   ├── bin/remodex.js      # CLI entrypoint
+│   ├── bin/pocketex.js      # CLI entrypoint
 │   └── src/
 │       ├── bridge.js               # Core relay + message forwarding
 │       ├── codex-transport.js      # Spawn vs WebSocket abstraction
 │       ├── codex-desktop-refresher.js  # Debounced Codex.app refresh
 │       ├── git-handler.js          # Git command execution from phone
 │       ├── workspace-handler.js    # Workspace/cwd management
-│       ├── session-state.js        # Thread persistence (~/.remodex/)
+│       ├── session-state.js        # Thread persistence (~/.pocketex/)
 │       ├── rollout-watch.js        # Thread event log tailing
 │       └── qr.js                   # QR code generation
 │
@@ -160,6 +160,6 @@ remodex/
 
 - The first QR pairing is possession-based: it contains the relay URL and a live session ID.
 - After that first handshake, the iPhone stores a trusted Mac record and can ask the relay for the Mac's current live session again.
-- Set `REMODEX_RELAY` to a relay you control when you are not using the local launcher. Use `wss://` when you want TLS in transit.
-- Remodex uses an authenticated end-to-end encrypted transport after pairing completes. The relay code is public for inspection, but deployed relay details should stay in private config.
+- Set `POCKETEX_RELAY` to a relay you control when you are not using the local launcher. Use `wss://` when you want TLS in transit.
+- Pocketex uses an authenticated end-to-end encrypted transport after pairing completes. The relay code is public for inspection, but deployed relay details should stay in private config.
 - The built-in daemon / background service path is currently macOS-only. Linux and Windows can still run the bridge, but contributors should treat the daemon logic as platform-specific.
