@@ -127,7 +127,7 @@ test("sanitizeThreadHistoryImagesForRelay replaces inline history images with li
   });
   assert.deepEqual(content[1], {
     type: "image",
-    url: "rimcodex://history-image-elided",
+    url: "pocketex://history-image-elided",
   });
 });
 
@@ -166,7 +166,7 @@ test("describePendingBridgeRequest treats structured input separately from appro
       eventType: "structured_user_input_needed",
       threadId: "thread-1",
       turnId: "turn-1",
-      title: "rimcodex input needed",
+      title: "pocketex input needed",
       body: "Codex needs 2 answers to continue.",
       dedupeKey: "structured-user-input:req-input-1",
       eventPayload: {
