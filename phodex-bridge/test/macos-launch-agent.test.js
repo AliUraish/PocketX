@@ -24,21 +24,21 @@ const {
   writePairingSession,
 } = require("../src/daemon-state");
 
-test("buildLaunchAgentPlist points launchd at run-service with rimcodex state paths", () => {
+test("buildLaunchAgentPlist points launchd at run-service with pocketex state paths", () => {
   const plist = buildLaunchAgentPlist({
     homeDir: "/Users/tester",
     pathEnv: "/usr/local/bin:/usr/bin",
-    stateDir: "/Users/tester/.rimcodex",
-    stdoutLogPath: "/Users/tester/.rimcodex/logs/bridge.stdout.log",
-    stderrLogPath: "/Users/tester/.rimcodex/logs/bridge.stderr.log",
+    stateDir: "/Users/tester/.pocketex",
+    stdoutLogPath: "/Users/tester/.pocketex/logs/bridge.stdout.log",
+    stderrLogPath: "/Users/tester/.pocketex/logs/bridge.stderr.log",
     nodePath: "/usr/local/bin/node",
-    cliPath: "/tmp/rimcodex/bin/rimcodex.js",
+    cliPath: "/tmp/pocketex/bin/pocketex.js",
   });
 
-  assert.match(plist, /<string>com\.rimcodex\.bridge<\/string>/);
+  assert.match(plist, /<string>com\.pocketex\.bridge<\/string>/);
   assert.match(plist, /<string>run-service<\/string>/);
   assert.match(plist, /<key>KeepAlive<\/key>\s*<dict>\s*<key>SuccessfulExit<\/key>\s*<false\/>\s*<\/dict>/);
-  assert.match(plist, /<key>RIMCODEX_DEVICE_STATE_DIR<\/key>/);
+  assert.match(plist, /<key>POCKETEX_DEVICE_STATE_DIR<\/key>/);
 });
 
 test("resolveLaunchAgentPlistPath writes into the user's LaunchAgents folder", () => {
@@ -47,7 +47,7 @@ test("resolveLaunchAgentPlistPath writes into the user's LaunchAgents folder", (
       env: { HOME: "/Users/tester" },
       osImpl: { homedir: () => "/Users/fallback" },
     }),
-    path.join("/Users/tester", "Library", "LaunchAgents", "com.rimcodex.bridge.plist")
+    path.join("/Users/tester", "Library", "LaunchAgents", "com.pocketex.bridge.plist")
   );
 });
 
@@ -92,14 +92,14 @@ test("stopMacOSBridgeService falls back to label bootout when plist bootout fail
         [
           "bootout",
           `gui/${process.getuid()}`,
-          path.join(process.env.HOME, "Library", "LaunchAgents", "com.rimcodex.bridge.plist"),
+          path.join(process.env.HOME, "Library", "LaunchAgents", "com.pocketex.bridge.plist"),
         ],
       ],
       [
         "launchctl",
         [
           "bootout",
-          `gui/${process.getuid()}/com.rimcodex.bridge`,
+          `gui/${process.getuid()}/com.pocketex.bridge`,
         ],
       ],
     ]);
@@ -158,13 +158,13 @@ test("getMacOSBridgeServiceStatus reports launchd + runtime metadata together", 
     writePairingSession({ sessionId: "session-2" });
     writeBridgeStatus({ state: "running", connectionStatus: "connected", pid: 55 });
 
-    const plistPath = path.join(rootDir, "LaunchAgents", "com.rimcodex.bridge.plist");
+    const plistPath = path.join(rootDir, "LaunchAgents", "com.pocketex.bridge.plist");
     fs.mkdirSync(path.dirname(plistPath), { recursive: true });
     fs.writeFileSync(plistPath, "plist");
 
     const status = getMacOSBridgeServiceStatus({
       platform: "darwin",
-      env: { HOME: rootDir, REMODEX_DEVICE_STATE_DIR: rootDir },
+      env: { HOME: rootDir, POCKETEX_DEVICE_STATE_DIR: rootDir },
       execFileSyncImpl() {
         return "pid = 55";
       },
@@ -178,19 +178,19 @@ test("getMacOSBridgeServiceStatus reports launchd + runtime metadata together", 
 });
 
 function withTempDaemonEnv(run) {
-  const previousDir = process.env.REMODEX_DEVICE_STATE_DIR;
+  const previousDir = process.env.POCKETEX_DEVICE_STATE_DIR;
   const previousHome = process.env.HOME;
-  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "rimcodex-launch-agent-"));
-  process.env.REMODEX_DEVICE_STATE_DIR = rootDir;
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "pocketex-launch-agent-"));
+  process.env.POCKETEX_DEVICE_STATE_DIR = rootDir;
   process.env.HOME = rootDir;
 
   try {
     return run({ rootDir });
   } finally {
     if (previousDir === undefined) {
-      delete process.env.REMODEX_DEVICE_STATE_DIR;
+      delete process.env.POCKETEX_DEVICE_STATE_DIR;
     } else {
-      process.env.REMODEX_DEVICE_STATE_DIR = previousDir;
+      process.env.POCKETEX_DEVICE_STATE_DIR = previousDir;
     }
     if (previousHome === undefined) {
       delete process.env.HOME;
