@@ -308,7 +308,7 @@ extension CodexService {
         case (_, .healthy) where previousState != .healthy && previousState != .unknown:
             eventTypeAndBody = (
                 .reconnectSucceeded,
-                "rimcodex reconnected",
+                "pocketex reconnected",
                 "Your Mac bridge is reachable again."
             )
         case (.healthy, .relayUnreachable),
@@ -318,7 +318,7 @@ extension CodexService {
              (.healthy, .macSleepingOrUnresponsive):
             eventTypeAndBody = (
                 .bridgeOffline,
-                "rimcodex went offline",
+                "pocketex went offline",
                 bridgeHealthPresentation?.detail ?? bridgeHealthPresentation?.summary ?? "The Mac bridge is no longer reachable."
             )
         case (.reconnecting, .relayUnreachable),
@@ -329,7 +329,7 @@ extension CodexService {
              (.reconnecting, .versionMismatch):
             eventTypeAndBody = (
                 .reconnectFailed,
-                "rimcodex reconnect failed",
+                "pocketex reconnect failed",
                 bridgeHealthPresentation?.detail ?? bridgeHealthPresentation?.summary ?? "The Mac bridge could not be restored."
             )
         default:
@@ -685,7 +685,7 @@ private extension CodexService {
         content.title = title
         content.body = body
         content.sound = .default
-        content.threadIdentifier = threadId ?? "rimcodex.bridge"
+        content.threadIdentifier = threadId ?? "pocketex.bridge"
 
         var userInfo: [String: Any] = [
             CodexNotificationPayloadKeys.source: CodexNotificationSource.bridgeEvent,
