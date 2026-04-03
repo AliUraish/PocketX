@@ -344,7 +344,7 @@ struct CommandExecutionDetailSheet: View {
                 .padding(12)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color(.secondarySystemBackground))
+                        .fill(DesignTokens.Colors.cardBackground)
                 )
         }
     }
@@ -406,7 +406,7 @@ struct CommandExecutionDetailSheet: View {
                     .padding(12)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color(.secondarySystemBackground))
+                            .fill(DesignTokens.Colors.cardBackground)
                     )
             }
         }
