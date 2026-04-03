@@ -74,13 +74,13 @@ test("loadOrCreateBridgeDeviceState migrates a valid Keychain mirror into the ca
   });
 });
 
-test("loadOrCreateBridgeDeviceState throws when only the legacy Keychain mirror is corrupted", () => {
+test("loadOrCreateBridgeDeviceState throws when only the Keychain mirror is corrupted", () => {
   withTempDeviceStateEnv(({ keychainMirrorFile, canonicalStateFile }) => {
     fs.writeFileSync(keychainMirrorFile, "{ definitely-not-json", "utf8");
 
     assert.throws(
       () => loadOrCreateBridgeDeviceState(),
-      /saved rimcodex pairing state in legacy Keychain bridge state is unreadable/i
+      /saved pocketex pairing state in Keychain bridge state is unreadable/i
     );
     assert.equal(fs.existsSync(canonicalStateFile), false);
   });
@@ -111,7 +111,7 @@ test("loadOrCreateBridgeDeviceState throws when the canonical file is corrupted 
 
     assert.throws(
       () => loadOrCreateBridgeDeviceState(),
-      /saved rimcodex pairing state in device-state\.json is unreadable/i
+      /saved pocketex pairing state in device-state\.json is unreadable/i
     );
   });
 });
@@ -167,28 +167,28 @@ function makeDeviceState(overrides = {}) {
 }
 
 function withTempDeviceStateEnv(run) {
-  const previousDir = process.env.REMODEX_DEVICE_STATE_DIR;
-  const previousMirror = process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE;
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rimcodex-device-state-"));
+  const previousDir = process.env.POCKETEX_DEVICE_STATE_DIR;
+  const previousMirror = process.env.POCKETEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE;
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "pocketex-device-state-"));
   const canonicalStateFile = path.join(tempRoot, "device-state.json");
   const keychainMirrorFile = path.join(tempRoot, "keychain-device-state.json");
 
-  process.env.REMODEX_DEVICE_STATE_DIR = tempRoot;
-  process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE = keychainMirrorFile;
+  process.env.POCKETEX_DEVICE_STATE_DIR = tempRoot;
+  process.env.POCKETEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE = keychainMirrorFile;
 
   try {
     return run({ canonicalStateFile, keychainMirrorFile });
   } finally {
     if (previousDir === undefined) {
-      delete process.env.REMODEX_DEVICE_STATE_DIR;
+      delete process.env.POCKETEX_DEVICE_STATE_DIR;
     } else {
-      process.env.REMODEX_DEVICE_STATE_DIR = previousDir;
+      process.env.POCKETEX_DEVICE_STATE_DIR = previousDir;
     }
 
     if (previousMirror === undefined) {
-      delete process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE;
+      delete process.env.POCKETEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE;
     } else {
-      process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE = previousMirror;
+      process.env.POCKETEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE = previousMirror;
     }
 
     fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -196,7 +196,7 @@ function withTempDeviceStateEnv(run) {
 }
 
 function readCanonicalStateFromDisk() {
-  const canonicalStateFile = path.join(process.env.REMODEX_DEVICE_STATE_DIR, "device-state.json");
+  const canonicalStateFile = path.join(process.env.POCKETEX_DEVICE_STATE_DIR, "device-state.json");
   return JSON.parse(fs.readFileSync(canonicalStateFile, "utf8"));
 }
 
