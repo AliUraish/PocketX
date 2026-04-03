@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 // FILE: phodex.js
-// Purpose: Backward-compatible wrapper that forwards legacy `phodex up` usage to `rimcodex up`.
+// Purpose: Backward-compatible wrapper that forwards legacy `phodex up` usage to `pocketex up`.
 // Layer: CLI binary
 // Exports: none
-// Depends on: ./rimcodex
+// Depends on: ./pocketex
 
-const { main } = require("./rimcodex");
+const { main } = require("./pocketex");
 
-void main();
+if (require.main === module) {
+  void main();
+}
+
+module.exports = {
+  main,
+};
