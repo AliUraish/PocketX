@@ -12,7 +12,7 @@ const path = require("path");
 const {
   clearBridgeStatus,
   clearPairingSession,
-  ensureRemodexLogsDir,
+  ensurePocketexLogsDir,
   readBridgeStatus,
   readDaemonConfig,
   readPairingSession,
@@ -21,13 +21,13 @@ const {
   resolveBridgeStdoutLogPath,
   resolveDaemonConfigPath,
   resolvePairingSessionPath,
-  resolveRemodexStateDir,
+  resolvePocketexStateDir,
   writeBridgeStatus,
   writeDaemonConfig,
   writePairingSession,
 } = require("../src/daemon-state");
 
-test("daemon-state stores config, pairing payloads, and status under the rimcodex state dir", () => {
+test("daemon-state stores config, pairing payloads, and status under the pocketex state dir", () => {
   withTempDaemonEnv(({ rootDir }) => {
     writeDaemonConfig({ relayUrl: "ws://127.0.0.1:9000/relay" });
     writePairingSession({ sessionId: "session-1" }, {
@@ -37,7 +37,7 @@ test("daemon-state stores config, pairing payloads, and status under the rimcode
       now: () => 1_710_000_100_000,
     });
 
-    assert.equal(resolveRemodexStateDir(), rootDir);
+    assert.equal(resolvePocketexStateDir(), rootDir);
     assert.deepEqual(readDaemonConfig(), { relayUrl: "ws://127.0.0.1:9000/relay" });
     assert.equal(readPairingSession()?.pairingPayload?.sessionId, "session-1");
     assert.equal(readBridgeStatus()?.connectionStatus, "connected");
@@ -99,7 +99,7 @@ test("daemon-state clears stale runtime files without touching the config", () =
 
 test("daemon-state creates the logs directory and derived log paths inside the state root", () => {
   withTempDaemonEnv(({ rootDir }) => {
-    ensureRemodexLogsDir({});
+    ensurePocketexLogsDir({});
 
     assert.equal(resolveBridgeLogsDir(), path.join(rootDir, "logs"));
     assert.equal(resolveBridgeStdoutLogPath(), path.join(rootDir, "logs", "bridge.stdout.log"));
@@ -108,17 +108,17 @@ test("daemon-state creates the logs directory and derived log paths inside the s
 });
 
 function withTempDaemonEnv(run) {
-  const previousDir = process.env.REMODEX_DEVICE_STATE_DIR;
-  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "rimcodex-daemon-state-"));
-  process.env.REMODEX_DEVICE_STATE_DIR = rootDir;
+  const previousDir = process.env.POCKETEX_DEVICE_STATE_DIR;
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "pocketex-daemon-state-"));
+  process.env.POCKETEX_DEVICE_STATE_DIR = rootDir;
 
   try {
     return run({ rootDir });
   } finally {
     if (previousDir === undefined) {
-      delete process.env.REMODEX_DEVICE_STATE_DIR;
+      delete process.env.POCKETEX_DEVICE_STATE_DIR;
     } else {
-      process.env.REMODEX_DEVICE_STATE_DIR = previousDir;
+      process.env.POCKETEX_DEVICE_STATE_DIR = previousDir;
     }
     fs.rmSync(rootDir, { recursive: true, force: true });
   }
