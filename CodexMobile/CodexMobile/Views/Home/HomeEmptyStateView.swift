@@ -51,11 +51,11 @@ struct HomeEmptyStateView<AuthSection: View>: View {
                 .padding(.vertical, 7)
                 .background(
                     Capsule()
-                        .fill(Color(.systemBackground))
+                        .fill(DesignTokens.Colors.cardBackground)
                 )
                 .overlay(
                     Capsule()
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                        .stroke(DesignTokens.Colors.cardBorder, lineWidth: 1)
                 )
 
                 if let trustedPairPresentation {
@@ -172,11 +172,11 @@ struct HomeEmptyStateView<AuthSection: View>: View {
     }
 
     private var primaryButtonBackground: Color {
-        isSocketReady ? Color(.secondarySystemFill) : Color.primary
+        isSocketReady ? DesignTokens.Colors.cardBackground : DesignTokens.Colors.glassAccent
     }
 
     private var primaryButtonForeground: Color {
-        isSocketReady ? Color.primary : Color(.systemBackground)
+        isSocketReady ? Color.primary : Color.white
     }
 
     private var isSocketReady: Bool {
