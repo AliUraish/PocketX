@@ -7,7 +7,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  buildPendingBridgeRequestLifecycleEvent,
+  buildStructuredUserInputNotificationBody,
   buildHeartbeatBridgeStatus,
+  describePendingBridgeRequest,
   hasRelayConnectionGoneStale,
   sanitizeThreadHistoryImagesForRelay,
 } = require("../src/bridge");
@@ -140,4 +143,77 @@ test("sanitizeThreadHistoryImagesForRelay leaves unrelated RPC payloads unchange
     sanitizeThreadHistoryImagesForRelay(rawMessage, "turn/start"),
     rawMessage
   );
+});
+
+test("describePendingBridgeRequest treats structured input separately from approvals", () => {
+  const structuredInput = describePendingBridgeRequest({
+    requestId: "req-input-1",
+    method: "item/tool/requestUserInput",
+    threadId: "thread-1",
+    turnId: "turn-1",
+    params: {
+      questions: [{ id: "mode" }, { id: "risk" }],
+    },
+  });
+
+  assert.deepEqual(structuredInput, {
+    kind: "structured_user_input",
+    requestId: "req-input-1",
+    threadId: "thread-1",
+    turnId: "turn-1",
+    questionCount: 2,
+    pushEvent: {
+      eventType: "structured_user_input_needed",
+      threadId: "thread-1",
+      turnId: "turn-1",
+      title: "rimcodex input needed",
+      body: "Codex needs 2 answers to continue.",
+      dedupeKey: "structured-user-input:req-input-1",
+      eventPayload: {
+        requestId: "req-input-1",
+        questionCount: 2,
+      },
+    },
+  });
+
+  const approval = describePendingBridgeRequest({
+    requestId: "req-approval-1",
+    method: "item/commandExecution/requestApproval",
+    threadId: "thread-2",
+    turnId: "turn-2",
+    params: {
+      reason: "Approval needed to continue the run.",
+    },
+  });
+
+  assert.equal(approval.kind, "approval");
+  assert.equal(approval.pushEvent.eventType, "approval_needed");
+  assert.equal(approval.pushEvent.body, "Approval needed to continue the run.");
+});
+
+test("buildPendingBridgeRequestLifecycleEvent uses structured input-specific messages", () => {
+  const lifecycleEvent = buildPendingBridgeRequestLifecycleEvent({
+    kind: "structured_user_input",
+    threadId: "thread-1",
+    turnId: "turn-1",
+    questionCount: 1,
+  }, "requested");
+
+  assert.deepEqual(lifecycleEvent, {
+    type: "structured_user_input.requested",
+    level: "warning",
+    message: "Codex needs input to continue.",
+    detail: "Codex needs one answer to continue.",
+    metadata: {
+      threadId: "thread-1",
+      turnId: "turn-1",
+      questionCount: 1,
+    },
+  });
+});
+
+test("buildStructuredUserInputNotificationBody handles singular, plural, and fallback phrasing", () => {
+  assert.equal(buildStructuredUserInputNotificationBody(1), "Codex needs one answer to continue.");
+  assert.equal(buildStructuredUserInputNotificationBody(3), "Codex needs 3 answers to continue.");
+  assert.equal(buildStructuredUserInputNotificationBody(0), "Codex needs input to continue.");
 });
