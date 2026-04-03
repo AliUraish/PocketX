@@ -96,9 +96,9 @@ extension CodexService {
 private extension CodexService {
     var threadForkBridgeUpdatePrompt: CodexBridgeUpdatePrompt {
         CodexBridgeUpdatePrompt(
-            title: "Update rimcodex on your Mac to use /fork",
-            message: "This Mac bridge does not support native conversation forks yet. Update the rimcodex npm package to use /fork and worktree fork flows.",
-            command: "npm install -g rimcodex@latest"
+            title: "Update pocketex on your Mac to use /fork",
+            message: "This Mac bridge does not support native conversation forks yet. Update the pocketex npm package to use /fork and worktree fork flows.",
+            command: "npm install -g pocketex@latest"
         )
     }
 }
