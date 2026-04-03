@@ -508,6 +508,7 @@ extension CodexService {
 
         if let threadId {
             markThreadAsRunning(threadId)
+            bindPhoneOriginatedRunNotificationEligibility(turnId: turnID, for: threadId)
         }
 
         if let threadId, let turnID {
@@ -553,6 +554,11 @@ extension CodexService {
             } else if terminalState == .failed {
                 markFailedIfUnread(threadId: threadId)
                 notifyRunCompletionIfNeeded(threadId: threadId, turnId: resolvedTurnID, result: .failed)
+            } else {
+                consumePhoneOriginatedRunNotificationEligibility(
+                    threadId: threadId,
+                    turnId: resolvedTurnID
+                )
             }
             requestImmediateSync(threadId: threadId)
 
@@ -681,6 +687,11 @@ extension CodexService {
                         threadId: threadId,
                         turnId: activeTurnIdForThread,
                         result: completionResult
+                    )
+                } else {
+                    consumePhoneOriginatedRunNotificationEligibility(
+                        threadId: threadId,
+                        turnId: activeTurnIdForThread
                     )
                 }
             }
