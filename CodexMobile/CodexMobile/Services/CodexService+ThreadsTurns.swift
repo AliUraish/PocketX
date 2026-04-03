@@ -404,20 +404,32 @@ extension CodexService {
         let isCommandApproval = normalizedMethod == "item/commandExecution/requestApproval"
             || normalizedMethod == "item/command_execution/request_approval"
         let decision = (forSession && isCommandApproval) ? "acceptForSession" : "accept"
+        rememberPhoneOriginatedRunNotificationEligibility(
+            threadId: resolvedRequest.threadId,
+            turnId: resolvedRequest.turnId
+        )
 
-        if isBridgeProtocolAvailable {
-            guard let bridgeRequestId = bridgeApprovalRequestIdentifier(for: resolvedRequest) else {
-                throw CodexServiceError.invalidInput("Approval request is missing a bridge request identifier")
+        do {
+            if isBridgeProtocolAvailable {
+                guard let bridgeRequestId = bridgeApprovalRequestIdentifier(for: resolvedRequest) else {
+                    throw CodexServiceError.invalidInput("Approval request is missing a bridge request identifier")
+                }
+                _ = try await sendRequest(
+                    method: "bridge/approval/resolve",
+                    params: .object([
+                        "requestId": .string(bridgeRequestId),
+                        "decision": .string(decision),
+                    ])
+                )
+            } else {
+                try await sendResponse(id: resolvedRequest.requestID, result: approvalDecisionResult(decision))
             }
-            _ = try await sendRequest(
-                method: "bridge/approval/resolve",
-                params: .object([
-                    "requestId": .string(bridgeRequestId),
-                    "decision": .string(decision),
-                ])
+        } catch {
+            clearPhoneOriginatedRunNotificationEligibility(
+                threadId: resolvedRequest.threadId,
+                turnId: resolvedRequest.turnId
             )
-        } else {
-            try await sendResponse(id: resolvedRequest.requestID, result: approvalDecisionResult(decision))
+            throw error
         }
         removePendingApproval(idKey: resolvedRequest.id)
     }
@@ -429,19 +441,32 @@ extension CodexService {
             throw CodexServiceError.noPendingApproval
         }
 
-        if isBridgeProtocolAvailable {
-            guard let bridgeRequestId = bridgeApprovalRequestIdentifier(for: resolvedRequest) else {
-                throw CodexServiceError.invalidInput("Approval request is missing a bridge request identifier")
+        rememberPhoneOriginatedRunNotificationEligibility(
+            threadId: resolvedRequest.threadId,
+            turnId: resolvedRequest.turnId
+        )
+
+        do {
+            if isBridgeProtocolAvailable {
+                guard let bridgeRequestId = bridgeApprovalRequestIdentifier(for: resolvedRequest) else {
+                    throw CodexServiceError.invalidInput("Approval request is missing a bridge request identifier")
+                }
+                _ = try await sendRequest(
+                    method: "bridge/approval/resolve",
+                    params: .object([
+                        "requestId": .string(bridgeRequestId),
+                        "decision": .string("decline"),
+                    ])
+                )
+            } else {
+                try await sendResponse(id: resolvedRequest.requestID, result: approvalDecisionResult("decline"))
             }
-            _ = try await sendRequest(
-                method: "bridge/approval/resolve",
-                params: .object([
-                    "requestId": .string(bridgeRequestId),
-                    "decision": .string("decline"),
-                ])
+        } catch {
+            clearPhoneOriginatedRunNotificationEligibility(
+                threadId: resolvedRequest.threadId,
+                turnId: resolvedRequest.turnId
             )
-        } else {
-            try await sendResponse(id: resolvedRequest.requestID, result: approvalDecisionResult("decline"))
+            throw error
         }
         removePendingApproval(idKey: resolvedRequest.id)
     }
@@ -451,10 +476,28 @@ extension CodexService {
         requestID: JSONValue,
         answersByQuestionID: [String: [String]]
     ) async throws {
-        try await sendResponse(
-            id: requestID,
-            result: buildStructuredUserInputResponse(answersByQuestionID: answersByQuestionID)
-        )
+        let requestContext = structuredUserInputRequestContext(requestID: requestID)
+        if let requestContext {
+            rememberPhoneOriginatedRunNotificationEligibility(
+                threadId: requestContext.threadId,
+                turnId: requestContext.turnId
+            )
+        }
+
+        do {
+            try await sendResponse(
+                id: requestID,
+                result: buildStructuredUserInputResponse(answersByQuestionID: answersByQuestionID)
+            )
+        } catch {
+            if let requestContext {
+                clearPhoneOriginatedRunNotificationEligibility(
+                    threadId: requestContext.threadId,
+                    turnId: requestContext.turnId
+                )
+            }
+            throw error
+        }
     }
 
     private func bridgeApprovalRequestIdentifier(for request: CodexApprovalRequest) -> String? {
@@ -775,6 +818,7 @@ extension CodexService {
         activeThreadId = threadId
         markThreadAsRunning(threadId)
         setProtectedRunningFallback(true, for: threadId)
+        rememberPhoneOriginatedRunNotificationEligibility(threadId: threadId)
 
         var includeStructuredSkillItems = supportsStructuredSkillInput && !skillMentions.isEmpty
         var imageURLKey = "url"
@@ -884,6 +928,10 @@ extension CodexService {
             handleSteerFailure(error, pendingMessageId: pendingMessageId, threadId: normalizedThreadID)
             throw error
         }
+        rememberPhoneOriginatedRunNotificationEligibility(
+            threadId: normalizedThreadID,
+            turnId: initialTurnID
+        )
 
         var includeStructuredSkillItems = supportsStructuredSkillInput && !skillMentions.isEmpty
         var imageURLKey = "url"
@@ -1142,6 +1190,7 @@ extension CodexService {
         pendingMessageId: String,
         threadId: String
     ) throws {
+        clearPhoneOriginatedRunNotificationEligibility(threadId: threadId)
         markMessageDeliveryState(threadId: threadId, messageId: pendingMessageId, state: .failed)
         clearRunningState(for: threadId)
         if shouldTreatAsThreadNotFound(error) {
@@ -1171,6 +1220,7 @@ extension CodexService {
         )
 
         if let turnID = resolvedTurnID {
+            bindPhoneOriginatedRunNotificationEligibility(turnId: turnID, for: threadId)
             activeTurnId = turnID
             setActiveTurnID(turnID, for: threadId)
             threadIdByTurnID[turnID] = threadId
@@ -1191,6 +1241,7 @@ extension CodexService {
         pendingMessageId: String,
         threadId: String
     ) {
+        clearPhoneOriginatedRunNotificationEligibility(threadId: threadId)
         markMessageDeliveryState(threadId: threadId, messageId: pendingMessageId, state: .failed)
         lastErrorMessage = userFacingTurnErrorMessage(from: error)
     }
@@ -1581,5 +1632,21 @@ extension CodexService {
         }
 
         return normalized.isEmpty ? "/" : normalized
+    }
+}
+
+private extension CodexService {
+    func structuredUserInputRequestContext(requestID: JSONValue) -> (threadId: String, turnId: String?)? {
+        for messages in messagesByThread.values {
+            guard let matchedMessage = messages.last(where: { message in
+                message.structuredUserInputRequest?.requestID == requestID
+            }) else {
+                continue
+            }
+
+            return (matchedMessage.threadId, matchedMessage.turnId)
+        }
+
+        return nil
     }
 }
