@@ -169,7 +169,8 @@ struct TurnComposerView: View {
                 )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .adaptiveGlass(.regular, in: RoundedRectangle(cornerRadius: 28))
+            .background(DesignTokens.Colors.inputBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(DesignTokens.Colors.cardBorder, lineWidth: 1))
             .overlay(alignment: .topLeading) {
                 Color.clear
                     .frame(maxWidth: .infinity, maxHeight: 0, alignment: .topLeading)
@@ -319,13 +320,26 @@ private struct TurnComposerQueuedDraftsSection: View {
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding([.horizontal, .bottom], 4)
-                .adaptiveGlass(.regular, in: UnevenRoundedRectangle(
-                    topLeadingRadius: 28,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: 28,
-                    style: .continuous
-                ))
+                .background(
+                    DesignTokens.Colors.inputBackground,
+                    in: UnevenRoundedRectangle(
+                        topLeadingRadius: 28,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 28,
+                        style: .continuous
+                    )
+                )
+                .overlay(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 28,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 28,
+                        style: .continuous
+                    )
+                    .stroke(DesignTokens.Colors.cardBorder, lineWidth: 1)
+                )
                 .padding(.bottom, -10)
                 .padding(.horizontal, 16)
             }
