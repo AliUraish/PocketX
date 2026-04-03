@@ -212,6 +212,27 @@ test("bridge event and request envelopes keep raw method context while normalizi
       },
     }
   );
+
+  assert.deepEqual(
+    buildBridgeRequestEnvelope("req-2", "item/tool/requestUserInput", {
+      threadId: "thread-2",
+      turnId: "turn-2",
+    }),
+    {
+      id: "req-2",
+      method: BRIDGE_REQUEST_METHOD,
+      params: {
+        event: "structured_user_input.requested",
+        rawMethod: "item/tool/requestUserInput",
+        rawParams: {
+          threadId: "thread-2",
+          turnId: "turn-2",
+        },
+        threadId: "thread-2",
+        turnId: "turn-2",
+      },
+    }
+  );
 });
 
 test("buildBridgeHealthSnapshot reports a stable mobile-facing health state", () => {
