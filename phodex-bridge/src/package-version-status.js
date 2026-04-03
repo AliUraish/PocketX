@@ -1,5 +1,5 @@
 // FILE: package-version-status.js
-// Purpose: Reads the installed rimcodex package version and caches the latest published npm version.
+// Purpose: Reads the installed pocketex package version and caches the latest published npm version.
 // Layer: CLI helper
 // Exports: createBridgePackageVersionStatusReader
 // Depends on: https, ../package.json
@@ -10,13 +10,13 @@ const { version: installedVersion = "" } = require("../package.json");
 const DEFAULT_CACHE_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_EMPTY_CACHE_RETRY_MS = 60 * 1000;
 const DEFAULT_INITIAL_FETCH_WAIT_MS = 250;
-const RIMCODEX_REGISTRY_URL = "https://registry.npmjs.org/rimcodex/latest";
+const POCKETEX_REGISTRY_URL = "https://registry.npmjs.org/pocketex/latest";
 
 function createBridgePackageVersionStatusReader({
   cacheTtlMs = DEFAULT_CACHE_TTL_MS,
   emptyCacheRetryMs = DEFAULT_EMPTY_CACHE_RETRY_MS,
   initialFetchWaitMs = DEFAULT_INITIAL_FETCH_WAIT_MS,
-  registryUrl = RIMCODEX_REGISTRY_URL,
+  registryUrl = POCKETEX_REGISTRY_URL,
   fetchLatestPublishedVersionImpl = fetchLatestPublishedVersion,
 } = {}) {
   let cachedLatestVersion = "";
