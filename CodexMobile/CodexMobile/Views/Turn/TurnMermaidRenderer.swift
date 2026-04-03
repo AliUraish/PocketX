@@ -9,6 +9,8 @@ import SwiftUI
 import UIKit
 import WebKit
 
+private let enablesInlineMarkdownSelectionInMermaid = false
+
 struct MermaidMarkdownContent {
     let segments: [MermaidMarkdownSegment]
 
@@ -84,7 +86,7 @@ struct MermaidMarkdownContentView: View {
                     MarkdownTextView(
                         text: markdown,
                         profile: .assistantProse,
-                        enablesSelection: enablesInlineMarkdownSelectionInTimeline
+                        enablesSelection: enablesInlineMarkdownSelectionInMermaid
                     )
                 case .mermaid(let source):
                     MermaidBlockView(source: source)
