@@ -110,12 +110,12 @@ extension CodexService {
             return CodexBridgeHealthPresentation(
                 state: .macOffline,
                 summary: "Your Mac is offline.",
-                detail: detailSuffix ?? "Wake the Mac and keep the rimcodex bridge running."
+                detail: detailSuffix ?? "Wake the Mac and keep the pocketex bridge running."
             )
         case .bridgeDown:
             return CodexBridgeHealthPresentation(
                 state: .bridgeDown,
-                summary: "The rimcodex bridge is down.",
+                summary: "The pocketex bridge is down.",
                 detail: detailSuffix ?? "Start the Mac bridge service, then reconnect."
             )
         case .relayUnreachable:
@@ -202,7 +202,7 @@ private extension CodexService {
 
         if let snapshot = bridgeHealthSnapshot,
            snapshot.relayHeartbeatStale {
-            return "The bridge heartbeat stalled. rimcodex is trying to restore the relay path."
+            return "The bridge heartbeat stalled. pocketex is trying to restore the relay path."
         }
 
         return normalizedBridgeHealthErrorMessage
@@ -215,8 +215,8 @@ private extension CodexService {
 
         if normalized.contains("update the npm package")
             || normalized.contains("too old for this version")
-            || normalized.contains("requires rimcodex")
-            || normalized.contains("update rimcodex on your mac") {
+            || normalized.contains("requires pocketex")
+            || normalized.contains("update pocketex on your mac") {
             return .versionMismatch
         }
 
@@ -270,10 +270,10 @@ private extension CodexService {
 
     func incompatibleBridgeVersionDetail(currentVersion: String?) -> String {
         guard let currentVersion = normalizedBridgeHealthPackageVersion(currentVersion) else {
-            return "Update rimcodex on your Mac to \(CodexService.minimumSupportedBridgePackageVersion) or newer, then reconnect."
+            return "Update pocketex on your Mac to \(CodexService.minimumSupportedBridgePackageVersion) or newer, then reconnect."
         }
 
-        return "This Mac bridge is running rimcodex \(currentVersion), but this iPhone app requires \(CodexService.minimumSupportedBridgePackageVersion) or newer."
+        return "This Mac bridge is running pocketex \(currentVersion), but this iPhone app requires \(CodexService.minimumSupportedBridgePackageVersion) or newer."
     }
 
     func normalizedBridgeHealthPackageVersion(_ value: String?) -> String? {
