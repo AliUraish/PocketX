@@ -24,7 +24,7 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
   const macConfig = readBridgeConfig({
     env: {},
     platform: "darwin",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/pocketex-package",
     fsImpl: {
       existsSync: () => false,
       readFileSync: () => {
@@ -33,9 +33,9 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
     },
   });
   const macEndpointConfig = readBridgeConfig({
-    env: { REMODEX_CODEX_ENDPOINT: "ws://localhost:8080" },
+    env: { POCKETEX_CODEX_ENDPOINT: "ws://localhost:8080" },
     platform: "darwin",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/pocketex-package",
     fsImpl: {
       existsSync: () => false,
       readFileSync: () => {
@@ -46,7 +46,7 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
   const linuxConfig = readBridgeConfig({
     env: {},
     platform: "linux",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/pocketex-package",
     fsImpl: {
       existsSync: () => false,
       readFileSync: () => {
@@ -55,9 +55,9 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
     },
   });
   const linuxCommandConfig = readBridgeConfig({
-    env: { REMODEX_REFRESH_COMMAND: "echo refresh" },
+    env: { POCKETEX_REFRESH_COMMAND: "echo refresh" },
     platform: "linux",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/pocketex-package",
     fsImpl: {
       existsSync: () => false,
       readFileSync: () => {
@@ -67,11 +67,11 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
   });
   const explicitOnConfig = readBridgeConfig({
     env: {
-      REMODEX_CODEX_ENDPOINT: "ws://localhost:8080",
-      REMODEX_REFRESH_ENABLED: "true",
+      POCKETEX_CODEX_ENDPOINT: "ws://localhost:8080",
+      POCKETEX_REFRESH_ENABLED: "true",
     },
     platform: "darwin",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/pocketex-package",
     fsImpl: {
       existsSync: () => false,
       readFileSync: () => {
@@ -81,11 +81,11 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
   });
   const explicitOffConfig = readBridgeConfig({
     env: {
-      REMODEX_REFRESH_COMMAND: "echo refresh",
-      REMODEX_REFRESH_ENABLED: "false",
+      POCKETEX_REFRESH_COMMAND: "echo refresh",
+      POCKETEX_REFRESH_ENABLED: "false",
     },
     platform: "darwin",
-    runtimeRoot: "/tmp/remodex-package",
+    runtimeRoot: "/tmp/pocketex-package",
     fsImpl: {
       existsSync: () => false,
       readFileSync: () => {
@@ -104,7 +104,7 @@ test("readBridgeConfig keeps safe defaults and explicit overrides", () => {
 });
 
 test("readBridgeConfig uses only the packaged relay default outside a source checkout", () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-package-"));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "pocketex-package-"));
   const srcDir = path.join(tempRoot, "src");
   fs.mkdirSync(srcDir, { recursive: true });
   fs.writeFileSync(
@@ -124,7 +124,7 @@ test("readBridgeConfig uses only the packaged relay default outside a source che
 });
 
 test("readBridgeConfig uses a packaged push default only when it is explicitly provided", () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-package-"));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "pocketex-package-"));
   const srcDir = path.join(tempRoot, "src");
   fs.mkdirSync(srcDir, { recursive: true });
   fs.writeFileSync(
@@ -164,7 +164,7 @@ test("readBridgeConfig does not use the hosted fallback inside a source checkout
 test("readBridgeConfig preserves reverse-proxy subpaths when deriving push URLs", () => {
   const config = readBridgeConfig({
     env: {
-      REMODEX_PUSH_SERVICE_URL: "https://relay.example/remodex",
+      POCKETEX_PUSH_SERVICE_URL: "https://relay.example/pocketex",
     },
     runtimeRoot: "/workspace/phodex-bridge",
     fsImpl: {
@@ -174,22 +174,22 @@ test("readBridgeConfig preserves reverse-proxy subpaths when deriving push URLs"
     },
   });
 
-  assert.equal(config.pushServiceUrl, "https://relay.example/remodex");
+  assert.equal(config.pushServiceUrl, "https://relay.example/pocketex");
 });
 
 test("readBridgeConfig disables managed push defaults when a self-hosted relay override is set", () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "remodex-package-"));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "pocketex-package-"));
   const srcDir = path.join(tempRoot, "src");
   fs.mkdirSync(srcDir, { recursive: true });
   fs.writeFileSync(
     path.join(srcDir, "private-defaults.json"),
-    JSON.stringify({ relayUrl: "wss://relay.example/remodex/relay" }),
+    JSON.stringify({ relayUrl: "wss://relay.example/pocketex/relay" }),
     "utf8"
   );
 
   const config = readBridgeConfig({
     env: {
-      REMODEX_RELAY: "wss://self-host.example/relay",
+      POCKETEX_RELAY: "wss://self-host.example/relay",
     },
     runtimeRoot: tempRoot,
     fsImpl: fs,
