@@ -604,7 +604,9 @@ extension CodexService {
                 didRunMirroredCatchup = true
             }
 
-            guard !didRefresh || !isStillRunning else {
+            // Also fall through when messages are empty: a confirmed-running thread with no
+            // local history still needs the thread/read fallback to populate the timeline.
+            guard !didRefresh || !isStillRunning || messages(for: threadId).isEmpty else {
                 return
             }
         }
