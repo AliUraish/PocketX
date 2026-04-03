@@ -1,5 +1,5 @@
 // FILE: CodexSecureTransportModels.swift
-// Purpose: Defines the wire payloads, device trust records, and crypto helpers for rimcodex E2EE.
+// Purpose: Defines the wire payloads, device trust records, and crypto helpers for pocketex E2EE.
 // Layer: Service support
 // Exports: Pairing/session models plus transcript, nonce, and key utility helpers
 // Depends on: Foundation, CryptoKit
@@ -10,10 +10,10 @@ import Foundation
 let codexSecureProtocolVersion = 1
 let codexPairingProtocolVersion = 2
 let codexPairingQRVersion = codexPairingProtocolVersion
-let codexSecureHandshakeTag = "rimcodex-e2ee-v1"
+let codexSecureHandshakeTag = "pocketex-e2ee-v1"
 let codexSecureHandshakeLabel = "client-auth"
 let codexSecureClockSkewToleranceSeconds: TimeInterval = 60
-let codexTrustedSessionResolveTag = "rimcodex-trusted-session-resolve-v1"
+let codexTrustedSessionResolveTag = "pocketex-trusted-session-resolve-v1"
 let codexTrustedSessionResolveClockSkewToleranceSeconds: TimeInterval = 90
 
 enum CodexSecureHandshakeMode: String, Codable, Sendable {
@@ -205,7 +205,7 @@ enum CodexSecureTransportError: LocalizedError {
              .timedOut(let message):
             return message
         case .decryptFailed:
-            return "Unable to decrypt the secure rimcodex payload."
+            return "Unable to decrypt the secure pocketex payload."
         }
     }
 }
