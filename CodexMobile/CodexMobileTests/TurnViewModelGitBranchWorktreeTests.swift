@@ -11,18 +11,18 @@ import XCTest
 final class TurnViewModelGitBranchWorktreeTests: XCTestCase {
     func testWorktreePathResolvesOnlyForBranchesCheckedOutElsewhere() {
         let viewModel = TurnViewModel()
-        viewModel.gitBranchesCheckedOutElsewhere = ["remodex/feature-a"]
+        viewModel.gitBranchesCheckedOutElsewhere = ["pocketex/feature-a"]
         viewModel.gitWorktreePathsByBranch = [
-            "remodex/feature-a": "/tmp/remodex-feature-a",
-            "main": "/tmp/remodex-main"
+            "pocketex/feature-a": "/tmp/pocketex-feature-a",
+            "main": "/tmp/pocketex-main"
         ]
 
         XCTAssertEqual(
-            viewModel.worktreePathForCheckedOutElsewhereBranch("remodex/feature-a"),
-            "/tmp/remodex-feature-a"
+            viewModel.worktreePathForCheckedOutElsewhereBranch("pocketex/feature-a"),
+            "/tmp/pocketex-feature-a"
         )
         XCTAssertNil(viewModel.worktreePathForCheckedOutElsewhereBranch("main"))
-        XCTAssertNil(viewModel.worktreePathForCheckedOutElsewhereBranch("remodex/missing"))
+        XCTAssertNil(viewModel.worktreePathForCheckedOutElsewhereBranch("pocketex/missing"))
     }
 
     func testApplyGitBranchTargetsStoresTrueLocalCheckoutPath() {
@@ -32,7 +32,7 @@ final class TurnViewModelGitBranchWorktreeTests: XCTestCase {
                 "branches": .array([.string("main")]),
                 "branchesCheckedOutElsewhere": .array([]),
                 "worktreePathByBranch": .object([:]),
-                "localCheckoutPath": .string("/tmp/remodex-local/phodex-bridge"),
+                "localCheckoutPath": .string("/tmp/pocketex-local/phodex-bridge"),
                 "current": .string("main"),
                 "default": .string("main"),
             ]
@@ -40,6 +40,6 @@ final class TurnViewModelGitBranchWorktreeTests: XCTestCase {
 
         viewModel.applyGitBranchTargets(result)
 
-        XCTAssertEqual(viewModel.gitLocalCheckoutPath, "/tmp/remodex-local/phodex-bridge")
+        XCTAssertEqual(viewModel.gitLocalCheckoutPath, "/tmp/pocketex-local/phodex-bridge")
     }
 }
