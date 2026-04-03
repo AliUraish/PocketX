@@ -6,7 +6,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { resolveRemodexStateDir } = require("./daemon-state");
+const { resolvePocketexStateDir } = require("./daemon-state");
 
 const APPROVAL_STATE_FILE = "approval-state.json";
 const MAX_APPROVAL_AUDIT_ENTRIES = 200;
@@ -162,7 +162,7 @@ function createBridgeApprovalStateStore({
 }
 
 function resolveApprovalStatePath(options = {}) {
-  return path.join(resolveRemodexStateDir(options), APPROVAL_STATE_FILE);
+  return path.join(resolvePocketexStateDir(options), APPROVAL_STATE_FILE);
 }
 
 function readApprovalStateFile({ fsImpl = fs, ...options } = {}) {
