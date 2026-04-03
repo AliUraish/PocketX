@@ -33,7 +33,7 @@ test("event log persists recent events and redacts bearer-like metadata", () => 
   const fsImpl = createMockFs();
   const env = {
     HOME: "/tmp/event-log-test",
-    RIMCODEX_DEVICE_STATE_DIR: "/tmp/event-log-test",
+    POCKETEX_DEVICE_STATE_DIR: "/tmp/event-log-test",
   };
   let now = 10_000;
 
