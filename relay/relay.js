@@ -268,6 +268,26 @@ function canAcceptIphoneConnection(session) {
   return Boolean(session.macAbsenceTimer);
 }
 
+function hasLiveIphoneSession(sessionId) {
+  const normalizedSessionId = normalizeNonEmptyString(sessionId);
+  if (!normalizedSessionId) {
+    return false;
+  }
+
+  const session = sessions.get(normalizedSessionId);
+  if (!session) {
+    return false;
+  }
+
+  for (const client of session.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function closeSessionClients(session, code, reason) {
   for (const client of session.clients) {
     if (client.readyState === WebSocket.OPEN || client.readyState === WebSocket.CONNECTING) {
@@ -675,5 +695,6 @@ module.exports = {
   getRelayStats,
   hasActiveMacSession,
   hasAuthenticatedMacSession,
+  hasLiveIphoneSession,
   resolveTrustedMacSession,
 };
