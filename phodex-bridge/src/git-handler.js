@@ -604,7 +604,7 @@ async function gitWorktreePathByBranch(cwd, options = {}) {
 }
 
 async function stashChangesForWorktreeHandoff(cwd) {
-  const stashLabel = `remodex-worktree-handoff-${randomBytes(6).toString("hex")}`;
+  const stashLabel = `pocketex-worktree-handoff-${randomBytes(6).toString("hex")}`;
   const output = await git(cwd, "stash", "push", "--include-untracked", "--message", stashLabel);
   if (output.includes("No local changes")) {
     return null;
@@ -668,7 +668,7 @@ async function applyCopiedLocalChangesToWorktree(cwd, patch) {
     return;
   }
 
-  const patchFilePath = path.join(os.tmpdir(), `remodex-worktree-copy-${randomBytes(6).toString("hex")}.patch`);
+  const patchFilePath = path.join(os.tmpdir(), `pocketex-worktree-copy-${randomBytes(6).toString("hex")}.patch`);
   fs.writeFileSync(patchFilePath, ensureTrailingNewline(patch), "utf8");
 
   try {
@@ -781,10 +781,10 @@ function normalizeCreatedBranchName(rawName) {
     .map((segment) => segment.trim().replace(/\s+/g, "-"))
     .join("/");
 
-  if (normalized.startsWith("remodex/")) {
+  if (normalized.startsWith("pocketex/")) {
     return normalized;
   }
-  return `remodex/${normalized}`;
+  return `pocketex/${normalized}`;
 }
 
 function resolveBaseBranchName(rawBaseBranch, fallbackBranch) {
