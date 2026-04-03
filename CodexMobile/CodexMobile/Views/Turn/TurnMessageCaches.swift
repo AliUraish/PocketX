@@ -197,7 +197,13 @@ enum MessageRowRenderModelCache {
     private static let cache = BoundedCache<String, MessageRowRenderModel>(maxEntries: 512)
 
     static func model(for message: CodexMessage, displayText: String) -> MessageRowRenderModel {
-        let key = "\(message.id)|\(message.kind.rawValue)|\(message.role.rawValue)|\(message.isStreaming)|\(TurnTextCacheKey.fingerprint(for: displayText))"
+        let contentKey: String
+        if message.role == .assistant && message.isStreaming {
+            contentKey = "streaming-count:\(displayText.count)"
+        } else {
+            contentKey = TurnTextCacheKey.fingerprint(for: displayText)
+        }
+        let key = "\(message.id)|\(message.kind.rawValue)|\(message.role.rawValue)|\(message.isStreaming)|\(contentKey)"
         return cache.getOrSet(key) { buildModel(for: message, displayText: displayText) }
     }
 
@@ -208,6 +214,9 @@ enum MessageRowRenderModelCache {
     private static func buildModel(for message: CodexMessage, displayText: String) -> MessageRowRenderModel {
         switch message.role {
         case .assistant:
+            if message.isStreaming {
+                return .empty
+            }
             // Defer Mermaid parsing until the assistant row is finalized so streaming deltas
             // keep the lightweight markdown path and avoid repeated WebKit churn.
             return MessageRowRenderModel(
