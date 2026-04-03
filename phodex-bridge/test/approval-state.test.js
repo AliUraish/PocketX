@@ -33,7 +33,7 @@ test("approval state store persists queue entries and resolved audit records", (
   const fsImpl = createMockFs();
   const env = {
     HOME: "/tmp/approval-test",
-    RIMCODEX_DEVICE_STATE_DIR: "/tmp/approval-test",
+    POCKETEX_DEVICE_STATE_DIR: "/tmp/approval-test",
   };
   let now = 1_000;
 
@@ -76,7 +76,7 @@ test("approval state store expires stale entries and clears old queue on new bri
   const fsImpl = createMockFs();
   const env = {
     HOME: "/tmp/approval-test",
-    RIMCODEX_DEVICE_STATE_DIR: "/tmp/approval-test",
+    POCKETEX_DEVICE_STATE_DIR: "/tmp/approval-test",
   };
   let now = 2_000;
 
