@@ -125,7 +125,7 @@ struct TurnGitActionsToolbarButton: View {
                                 .frame(width: 8, height: 8)
                                 .overlay {
                                     Circle()
-                                        .stroke(Color(.systemBackground), lineWidth: 1.5)
+                                        .stroke(DesignTokens.Colors.glassAccent, lineWidth: 1.5)
                                 }
                                 .offset(x: 2, y: -2)
                         }
