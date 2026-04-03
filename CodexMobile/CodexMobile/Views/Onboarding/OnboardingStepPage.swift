@@ -102,7 +102,7 @@ struct OnboardingStepPage: View {
             stepNumber: 1,
             icon: "terminal",
             title: "Install Codex CLI",
-            description: "The AI coding agent that lives in your terminal. rimcodex connects to it from your iPhone.",
+            description: "The AI coding agent that lives in your terminal. pocketex connects to it from your iPhone.",
             command: "npm install -g @openai/codex@latest"
         )
     }
@@ -117,7 +117,7 @@ struct OnboardingStepPage: View {
             icon: "link",
             title: "Install the Bridge",
             description: "A lightweight relay that securely connects your Mac to your iPhone.",
-            command: "npm install -g rimcodex@latest"
+            command: "npm install -g pocketex@latest"
         )
     }
     .preferredColorScheme(.dark)
@@ -131,7 +131,7 @@ struct OnboardingStepPage: View {
             icon: "number.square",
             title: "Start Pairing",
             description: "Run this on your Mac. A short pairing code will appear in your terminal. Enter that code on your iPhone next.",
-            command: "rimcodex up"
+            command: "pocketex up"
         )
     }
     .preferredColorScheme(.dark)
