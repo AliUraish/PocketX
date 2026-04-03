@@ -645,7 +645,7 @@ private struct SettingsNotificationsCard: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text("Used for local alerts when a run finishes while the app is in background.")
+            Text("Used for local alerts and managed push when runs finish or Codex needs input or approval while the app is away.")
                 .font(AppFont.caption())
                 .foregroundStyle(.secondary)
 
