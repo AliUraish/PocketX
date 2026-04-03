@@ -8,7 +8,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const DEFAULT_STATE_DIR_NAME = ".rimcodex";
+const DEFAULT_STATE_DIR_NAME = ".pocketex";
 const DAEMON_CONFIG_FILE = "daemon-config.json";
 const PAIRING_SESSION_FILE = "pairing-session.json";
 const BRIDGE_STATUS_FILE = "bridge-status.json";
@@ -16,27 +16,30 @@ const LOGS_DIR = "logs";
 const BRIDGE_STDOUT_LOG_FILE = "bridge.stdout.log";
 const BRIDGE_STDERR_LOG_FILE = "bridge.stderr.log";
 
-// Reuses the existing rimcodex state root so daemon mode keeps the same local-first storage model.
-function resolveRemodexStateDir({ env = process.env, osImpl = os } = {}) {
-  return normalizeNonEmptyString(env.RIMCODEX_DEVICE_STATE_DIR)
-    || normalizeNonEmptyString(env.REMODEX_DEVICE_STATE_DIR)
-    || path.join(osImpl.homedir(), DEFAULT_STATE_DIR_NAME);
+// Reuses the existing pocketex state root so daemon mode keeps the same local-first storage model.
+function resolvePocketexStateDir({ env = process.env, osImpl = os, fsImpl = fs } = {}) {
+  return normalizeNonEmptyString(env.POCKETEX_DEVICE_STATE_DIR)
+    || resolveDefaultStateDir({ osImpl, fsImpl });
+}
+
+function resolveDefaultStateDir({ osImpl = os } = {}) {
+  return path.join(osImpl.homedir(), DEFAULT_STATE_DIR_NAME);
 }
 
 function resolveDaemonConfigPath(options = {}) {
-  return path.join(resolveRemodexStateDir(options), DAEMON_CONFIG_FILE);
+  return path.join(resolvePocketexStateDir(options), DAEMON_CONFIG_FILE);
 }
 
 function resolvePairingSessionPath(options = {}) {
-  return path.join(resolveRemodexStateDir(options), PAIRING_SESSION_FILE);
+  return path.join(resolvePocketexStateDir(options), PAIRING_SESSION_FILE);
 }
 
 function resolveBridgeStatusPath(options = {}) {
-  return path.join(resolveRemodexStateDir(options), BRIDGE_STATUS_FILE);
+  return path.join(resolvePocketexStateDir(options), BRIDGE_STATUS_FILE);
 }
 
 function resolveBridgeLogsDir(options = {}) {
-  return path.join(resolveRemodexStateDir(options), LOGS_DIR);
+  return path.join(resolvePocketexStateDir(options), LOGS_DIR);
 }
 
 function resolveBridgeStdoutLogPath(options = {}) {
@@ -76,7 +79,7 @@ function clearPairingSession({ fsImpl = fs, ...options } = {}) {
   removeFile(resolvePairingSessionPath(options), fsImpl);
 }
 
-// Captures the last known service heartbeat so `rimcodex status` does not depend on launchctl output alone.
+// Captures the last known service heartbeat so `pocketex status` does not depend on launchctl output alone.
 function writeBridgeStatus(status, { now = () => Date.now(), ...options } = {}) {
   writeJsonFile(resolveBridgeStatusPath(options), {
     ...status,
@@ -92,11 +95,11 @@ function clearBridgeStatus({ fsImpl = fs, ...options } = {}) {
   removeFile(resolveBridgeStatusPath(options), fsImpl);
 }
 
-function ensureRemodexStateDir({ fsImpl = fs, ...options } = {}) {
-  fsImpl.mkdirSync(resolveRemodexStateDir(options), { recursive: true });
+function ensurePocketexStateDir({ fsImpl = fs, ...options } = {}) {
+  fsImpl.mkdirSync(resolvePocketexStateDir(options), { recursive: true });
 }
 
-function ensureRemodexLogsDir({ fsImpl = fs, ...options } = {}) {
+function ensurePocketexLogsDir({ fsImpl = fs, ...options } = {}) {
   fsImpl.mkdirSync(resolveBridgeLogsDir(options), { recursive: true });
 }
 
@@ -240,8 +243,8 @@ function normalizeNonEmptyString(value) {
 module.exports = {
   clearBridgeStatus,
   clearPairingSession,
-  ensureRemodexLogsDir,
-  ensureRemodexStateDir,
+  ensurePocketexLogsDir,
+  ensurePocketexStateDir,
   readBridgeStatus,
   readDaemonConfig,
   readPairingSession,
@@ -251,7 +254,7 @@ module.exports = {
   resolveBridgeStdoutLogPath,
   resolveDaemonConfigPath,
   resolvePairingSessionPath,
-  resolveRemodexStateDir,
+  resolvePocketexStateDir,
   writeBridgeStatus,
   writeDaemonConfig,
   writePairingSession,
