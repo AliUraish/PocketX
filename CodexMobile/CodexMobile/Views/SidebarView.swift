@@ -107,7 +107,7 @@ struct SidebarView: View {
             .padding(.top, 10)
         }
         .frame(maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(DesignTokens.Colors.chatBackground)
         .task {
             rebuildGroupedThreadsIfNeeded(force: true)
             rebuildCachedSidebarStateIfNeeded(force: true)
@@ -146,7 +146,8 @@ struct SidebarView: View {
             ) {
                 ProgressView()
                     .padding()
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .background(DesignTokens.Colors.cardBackground, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(DesignTokens.Colors.cardBorder, lineWidth: 1))
             }
         }
         .sheet(isPresented: $isShowingNewChatProjectPicker) {
