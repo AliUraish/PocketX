@@ -25,6 +25,7 @@ struct UsageStatusSummaryContent: View {
     let contextPlacement: ContextPlacement
     let showsRateLimitHeader: Bool
     let refreshControl: UsageStatusRefreshControl?
+    let emphasisColor: Color
 
     init(
         contextWindowUsage: ContextWindowUsage?,
@@ -33,7 +34,8 @@ struct UsageStatusSummaryContent: View {
         rateLimitsErrorMessage: String?,
         contextPlacement: ContextPlacement = .top,
         showsRateLimitHeader: Bool = true,
-        refreshControl: UsageStatusRefreshControl? = nil
+        refreshControl: UsageStatusRefreshControl? = nil,
+        emphasisColor: Color = .primary
     ) {
         self.contextWindowUsage = contextWindowUsage
         self.rateLimitBuckets = rateLimitBuckets
@@ -42,6 +44,7 @@ struct UsageStatusSummaryContent: View {
         self.contextPlacement = contextPlacement
         self.showsRateLimitHeader = showsRateLimitHeader
         self.refreshControl = refreshControl
+        self.emphasisColor = emphasisColor
     }
 
     var body: some View {
@@ -80,6 +83,7 @@ struct UsageStatusSummaryContent: View {
                 HStack {
                     Text("Rate limits")
                         .font(AppFont.subheadline(weight: .semibold))
+                        .foregroundStyle(emphasisColor)
 
                     Spacer(minLength: 12)
 
@@ -116,6 +120,7 @@ struct UsageStatusSummaryContent: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Context window")
                 .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(emphasisColor)
 
             if let contextWindowUsage {
                 metricRow(
@@ -169,7 +174,7 @@ struct UsageStatusSummaryContent: View {
 
                 Text("\(row.window.remainingPercent)% left")
                     .font(AppFont.mono(.callout))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(emphasisColor)
 
                 if let resetText = resetLabel(for: row.window) {
                     Text("(\(resetText))")
@@ -197,7 +202,7 @@ struct UsageStatusSummaryContent: View {
 
             Text(value)
                 .font(monospace ? AppFont.mono(.callout) : AppFont.headline(weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(emphasisColor)
 
             if let detail {
                 Text(detail)
@@ -220,7 +225,7 @@ struct UsageStatusSummaryContent: View {
                     .fill(Color.white.opacity(0.15))
 
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.white)
+                    .fill(emphasisColor)
                     .frame(width: totalWidth * CGFloat(clampedProgress))
             }
         }
