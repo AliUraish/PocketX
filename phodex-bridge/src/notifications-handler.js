@@ -4,7 +4,7 @@
 // Exports: createNotificationsHandler
 // Depends on: none
 
-function createNotificationsHandler({ pushServiceClient, logPrefix = "[rimcodex]" } = {}) {
+function createNotificationsHandler({ pushServiceClient, logPrefix = "[pocketex]" } = {}) {
   function handleNotificationsRequest(rawMessage, sendResponse) {
     let parsed;
     try {
