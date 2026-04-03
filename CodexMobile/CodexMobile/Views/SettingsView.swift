@@ -14,7 +14,7 @@ struct SettingsView: View {
 
     private let runtimeAutoValue = "__AUTO__"
     private let runtimeNormalValue = "__NORMAL__"
-    private let settingsAccentColor = Color(.plan)
+    private let settingsAccentColor = DesignTokens.Colors.glassAccent
 
     var body: some View {
         ScrollView {
@@ -31,6 +31,7 @@ struct SettingsView: View {
             }
             .padding()
         }
+        .background(DesignTokens.Colors.chatBackground.ignoresSafeArea())
         .font(AppFont.body())
         .navigationTitle("Settings")
         .sheet(isPresented: $isShowingMacNameSheet) {
@@ -451,7 +452,14 @@ struct SettingsCard<Content: View>: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.tertiarySystemFill).opacity(0.5), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(DesignTokens.Colors.cardBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(DesignTokens.Colors.cardBorder, lineWidth: 1)
+            )
         }
     }
 }
@@ -479,11 +487,11 @@ struct SettingsButton: View {
                 }
             }
             .font(AppFont.subheadline(weight: .medium))
-            .foregroundStyle(role == .destructive ? .red : (role == .cancel ? .secondary : .primary))
+            .foregroundStyle(role == .destructive ? .red : (role == .cancel ? .secondary : DesignTokens.Colors.glassAccent))
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
             .background(
-                (role == .destructive ? Color.red : Color.primary).opacity(0.08),
+                (role == .destructive ? Color.red : DesignTokens.Colors.glassAccent).opacity(0.14),
                 in: RoundedRectangle(cornerRadius: 10)
             )
         }
@@ -511,7 +519,8 @@ private struct SettingsUsageCard: View {
                     title: "Refresh",
                     isRefreshing: isRefreshing,
                     action: refreshStatus
-                )
+                ),
+                emphasisColor: DesignTokens.Colors.glassAccent
             )
 
             if activeThreadID == nil {
@@ -584,7 +593,7 @@ private struct SettingsUsageCard: View {
 private struct SettingsAppearanceCard: View {
     @Binding var appFontStyle: AppFont.Style
     @AppStorage("codex.useLiquidGlass") private var useLiquidGlass = true
-    private let settingsAccentColor = Color(.plan)
+    private let settingsAccentColor = DesignTokens.Colors.glassAccent
 
     var body: some View {
         SettingsCard(title: "Appearance") {
@@ -918,7 +927,7 @@ private struct SettingsBridgeVersionCard: View {
             return .secondary
         }
 
-        return .orange
+        return DesignTokens.Colors.glassAccent
     }
 
     private var installedValueStyle: Color {
@@ -928,7 +937,7 @@ private struct SettingsBridgeVersionCard: View {
             return .primary
         }
 
-        return .orange
+        return .primary
     }
 
     private var installedVersion: String? {
@@ -976,15 +985,16 @@ private struct SettingsArchivedChatsCard: View {
                 HStack {
                     Label("Archived Chats", systemImage: "archivebox")
                         .font(AppFont.subheadline(weight: .medium))
+                        .foregroundStyle(DesignTokens.Colors.glassAccent)
                     Spacer()
                     if archivedCount > 0 {
                         Text("\(archivedCount)")
                             .font(AppFont.caption(weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DesignTokens.Colors.glassAccent)
                     }
                     Image(systemName: "chevron.right")
                         .font(AppFont.caption(weight: .semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.75))
                 }
             }
             .buttonStyle(.plain)
@@ -1010,25 +1020,6 @@ private struct SettingsAboutCard: View {
                     leading: {
                         Image(systemName: "info.circle")
                             .font(AppFont.subheadline(weight: .medium))
-                    }
-                )
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                if let url = URL(string: "https://x.com/emanueledpt") {
-                    UIApplication.shared.open(url)
-                }
-            } label: {
-                settingsAccessoryRow(
-                    title: "Chat & Support",
-                    leading: {
-                        Image("x-icon")
-                            .renderingMode(.template)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 14, height: 14)
                     }
                 )
             }
@@ -1090,7 +1081,11 @@ private struct SettingsAboutCard: View {
         .padding(.horizontal, 14)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.primary.opacity(0.06))
+                .fill(DesignTokens.Colors.inputBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(DesignTokens.Colors.cardBorder, lineWidth: 1)
         )
     }
 }
@@ -1120,7 +1115,7 @@ private struct SettingsTrustedMacCard: View {
 
                         Text(presentation.name)
                             .font(AppFont.subheadline(weight: .semibold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(DesignTokens.Colors.glassAccent)
                             .lineLimit(1)
                             .minimumScaleFactor(0.85)
                     }
@@ -1135,7 +1130,7 @@ private struct SettingsTrustedMacCard: View {
                         .frame(width: 30, height: 30)
                         .background(
                             Circle()
-                                .fill(Color.primary.opacity(0.07))
+                                .fill(DesignTokens.Colors.inputBackground)
                         )
                 }
                 .buttonStyle(.plain)
@@ -1163,11 +1158,11 @@ private struct SettingsTrustedMacCard: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(.secondarySystemFill).opacity(0.45))
+                .fill(DesignTokens.Colors.inputBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.primary.opacity(0.05), lineWidth: 1)
+                .stroke(DesignTokens.Colors.cardBorder, lineWidth: 1)
         )
     }
 
@@ -1204,7 +1199,7 @@ private struct SettingsStatusPill: View {
             .padding(.vertical, 6)
             .background(
                 Capsule(style: .continuous)
-                    .fill(Color.primary.opacity(0.07))
+                    .fill(DesignTokens.Colors.inputBackground)
             )
     }
 }
