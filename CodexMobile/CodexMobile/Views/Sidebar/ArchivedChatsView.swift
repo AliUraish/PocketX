@@ -26,21 +26,24 @@ struct ArchivedChatsView: View {
                 VStack(spacing: 12) {
                     Image(systemName: "archivebox")
                         .font(.system(size: 36))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.8))
                     Text("No archived chats")
                         .font(AppFont.subheadline())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DesignTokens.Colors.glassAccent)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
                     ForEach(archivedThreads) { thread in
                         archivedRow(thread)
+                            .listRowBackground(DesignTokens.Colors.cardBackground)
                     }
                 }
                 .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
             }
         }
+        .background(DesignTokens.Colors.chatBackground.ignoresSafeArea())
         .navigationTitle("Archived Chats")
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog(
@@ -68,6 +71,7 @@ struct ArchivedChatsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(thread.displayTitle)
                     .font(AppFont.body())
+                    .foregroundStyle(DesignTokens.Colors.glassAccent)
                     .lineLimit(1)
 
                 if let date = thread.updatedAt ?? thread.createdAt {
@@ -94,7 +98,7 @@ struct ArchivedChatsView: View {
             } label: {
                 Label("Unarchive", systemImage: "tray.and.arrow.up")
             }
-            .tint(.blue)
+            .tint(DesignTokens.Colors.glassAccent)
         }
         .contextMenu {
             Button {
