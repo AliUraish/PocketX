@@ -690,7 +690,7 @@ extension CodexService {
         if nsError.domain == NSURLErrorDomain,
            nsError.code == NSURLErrorNotConnectedToInternet,
            requiresLocalNetworkAuthorization(for: URL(string: attemptedURL) ?? URL(fileURLWithPath: "/")) {
-            return "rimcodex cannot open the local relay connection on this iPhone. Check Local Network and the app's Wi-Fi/Cellular access in Settings, then retry."
+            return "pocketex cannot open the local relay connection on this iPhone. Check Local Network and the app's Wi-Fi/Cellular access in Settings, then retry."
         }
 
         return error.localizedDescription
@@ -910,7 +910,7 @@ extension CodexService {
             return nil
         }
 
-        return "The saved Mac session is temporarily unavailable. rimcodex will keep retrying. If you restarted the bridge on your Mac, enter the new pairing code."
+        return "The saved Mac session is temporarily unavailable. pocketex will keep retrying. If you restarted the bridge on your Mac, enter the new pairing code."
     }
 
     func retryableSessionUnavailableMessage(forConnectError error: Error) -> String? {
@@ -918,7 +918,7 @@ extension CodexService {
             return nil
         }
 
-        return "The saved Mac session is temporarily unavailable. rimcodex will keep retrying. If you restarted the bridge on your Mac, enter the new pairing code."
+        return "The saved Mac session is temporarily unavailable. pocketex will keep retrying. If you restarted the bridge on your Mac, enter the new pairing code."
     }
 
     // Surfaces relay-enforced drops that keep the pairing valid but lost the current send.
@@ -971,7 +971,7 @@ extension CodexService {
 
         guard status != .denied else {
             let message =
-                "rimcodex is not allowed to access your local network. Enable Local Network for rimcodex in iPhone Settings and try again."
+                "pocketex is not allowed to access your local network. Enable Local Network for pocketex in iPhone Settings and try again."
             lastErrorMessage = message
             throw CodexServiceError.invalidInput(message)
         }
