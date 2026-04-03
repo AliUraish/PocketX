@@ -8,6 +8,10 @@ import Foundation
 import UIKit
 
 extension CodexService {
+    private static let assistantDeltaFlushNanoseconds: UInt64 = 16_000_000
+    private static let streamingPersistenceDebounceNanoseconds: UInt64 = 750_000_000
+    private static let standardPersistenceDebounceNanoseconds: UInt64 = 250_000_000
+
     // Returns the full persisted timeline for a single thread.
     func messages(for threadId: String) -> [CodexMessage] {
         messagesByThread[threadId] ?? []
@@ -340,6 +344,16 @@ extension CodexService {
             _ = try? await ensureThreadResumed(threadId: threadId, force: true)
             guard !Task.isCancelled else {
                 return false
+            }
+            // If thread/resume returned no messages for the in-flight turn (e.g. the
+            // server doesn't embed history in resume responses for active runs), fall
+            // back to thread/read so the timeline shows existing context immediately
+            // instead of the blank "Working on it..." spinner until the async sync fires.
+            if messages(for: threadId).isEmpty {
+                try? await loadThreadHistoryIfNeeded(threadId: threadId, forceRefresh: true)
+                guard !Task.isCancelled else {
+                    return false
+                }
             }
             updateCurrentOutput(for: threadId)
         }
@@ -2046,14 +2060,31 @@ extension CodexService {
             return
         }
 
-        messagesByThread[threadId]?[messageIndex].text = nextText
-        messagesByThread[threadId]?[messageIndex].isStreaming = true
-        if messagesByThread[threadId]?[messageIndex].itemId == nil, let itemId {
-            messagesByThread[threadId]?[messageIndex].itemId = itemId
+        let normalizedItemId = itemId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if var bufferedState = bufferedAssistantDeltaByThread[threadId] {
+            if bufferedState.messageId != messageID {
+                flushBufferedAssistantDelta(for: threadId, persist: true)
+                bufferedAssistantDeltaByThread[threadId] = BufferedAssistantDeltaState(
+                    messageId: messageID,
+                    pendingDelta: delta,
+                    latestItemId: normalizedItemId
+                )
+            } else {
+                bufferedState.pendingDelta += delta
+                if bufferedState.latestItemId == nil {
+                    bufferedState.latestItemId = normalizedItemId
+                }
+                bufferedAssistantDeltaByThread[threadId] = bufferedState
+            }
+        } else {
+            bufferedAssistantDeltaByThread[threadId] = BufferedAssistantDeltaState(
+                messageId: messageID,
+                pendingDelta: delta,
+                latestItemId: normalizedItemId
+            )
         }
 
-        persistMessages()
-        updateStreamingAssistantOutput(for: threadId, messageId: messageID, rawMessageIndex: messageIndex)
+        scheduleBufferedAssistantDeltaFlush(for: threadId)
     }
 
     // Finalizes assistant text when item/completed carries the canonical message body.
@@ -2062,6 +2093,9 @@ extension CodexService {
         guard !trimmedText.isEmpty else {
             return
         }
+
+        flushBufferedAssistantDelta(for: threadId, persist: false)
+        clearBufferedAssistantDelta(for: threadId)
 
         let resolvedTurnId = turnId ?? activeTurnIdByThread[threadId]
         let now = Date()
@@ -2337,6 +2371,7 @@ extension CodexService {
 
     // Converts all pending streaming bubbles to completed state after transport failures.
     func finalizeAllStreamingState() {
+        flushAllBufferedAssistantDeltas(persist: false)
         var didMutate = false
 
         for threadId in messagesByThread.keys {
@@ -2361,6 +2396,9 @@ extension CodexService {
         streamingAssistantMessageByTurnID.removeAll()
         streamingSystemMessageByItemID.removeAll()
         threadIdByTurnID.removeAll()
+        bufferedAssistantDeltaByThread.removeAll()
+        assistantDeltaFlushTaskByThread.values.forEach { $0.cancel() }
+        assistantDeltaFlushTaskByThread.removeAll()
 
         if didMutate {
             messagePersistence.save(messagesByThread)
@@ -2372,10 +2410,13 @@ extension CodexService {
 }
 
 extension CodexService {
-    func persistMessages() {
+    func persistMessages(streaming: Bool = false) {
         messagePersistenceDebounceTask?.cancel()
+        let delay = streaming
+            ? Self.streamingPersistenceDebounceNanoseconds
+            : Self.standardPersistenceDebounceNanoseconds
         messagePersistenceDebounceTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 250_000_000)
+            try? await Task.sleep(nanoseconds: delay)
             guard !Task.isCancelled, let self else { return }
 
             let snapshot = self.messagesByThread
@@ -2392,6 +2433,65 @@ extension CodexService {
 // ─── Private helpers ──────────────────────────────────────────
 
 extension CodexService {
+    func scheduleBufferedAssistantDeltaFlush(for threadId: String) {
+        guard assistantDeltaFlushTaskByThread[threadId] == nil else {
+            return
+        }
+
+        assistantDeltaFlushTaskByThread[threadId] = Task { @MainActor [weak self] in
+            defer { self?.assistantDeltaFlushTaskByThread.removeValue(forKey: threadId) }
+            try? await Task.sleep(nanoseconds: Self.assistantDeltaFlushNanoseconds)
+            guard !Task.isCancelled, let self else { return }
+            self.flushBufferedAssistantDelta(for: threadId, persist: true)
+        }
+    }
+
+    func flushBufferedAssistantDelta(for threadId: String, persist: Bool) {
+        guard let bufferedState = bufferedAssistantDeltaByThread.removeValue(forKey: threadId),
+              let messageIndex = findMessageIndex(threadId: threadId, messageId: bufferedState.messageId) else {
+            return
+        }
+
+        let currentText = messagesByThread[threadId]?[messageIndex].text ?? ""
+        let nextText = mergeAssistantDelta(
+            existingText: currentText,
+            incomingDelta: bufferedState.pendingDelta
+        )
+        let existingItemId = messagesByThread[threadId]?[messageIndex].itemId
+        let didResolveItemId = existingItemId == nil && bufferedState.latestItemId != nil
+
+        guard nextText != currentText
+                || !(messagesByThread[threadId]?[messageIndex].isStreaming ?? false)
+                || didResolveItemId else {
+            return
+        }
+
+        messagesByThread[threadId]?[messageIndex].text = nextText
+        messagesByThread[threadId]?[messageIndex].isStreaming = true
+        if messagesByThread[threadId]?[messageIndex].itemId == nil,
+           let latestItemId = bufferedState.latestItemId {
+            messagesByThread[threadId]?[messageIndex].itemId = latestItemId
+        }
+
+        if persist {
+            persistMessages(streaming: true)
+        }
+        updateStreamingAssistantOutput(for: threadId, messageId: bufferedState.messageId, rawMessageIndex: messageIndex)
+    }
+
+    func flushAllBufferedAssistantDeltas(persist: Bool) {
+        let threadIDs = Array(bufferedAssistantDeltaByThread.keys)
+        for threadId in threadIDs {
+            flushBufferedAssistantDelta(for: threadId, persist: persist)
+        }
+    }
+
+    func clearBufferedAssistantDelta(for threadId: String) {
+        assistantDeltaFlushTaskByThread[threadId]?.cancel()
+        assistantDeltaFlushTaskByThread.removeValue(forKey: threadId)
+        bufferedAssistantDeltaByThread.removeValue(forKey: threadId)
+    }
+
     // Reuses the sidebar "ready" signal to surface a lightweight in-app banner for off-screen chats.
     func presentThreadCompletionBannerIfNeeded(threadId: String) {
         guard let thread = thread(for: threadId), !thread.isSubagent else {
