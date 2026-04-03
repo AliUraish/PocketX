@@ -20,7 +20,7 @@ test("APNs authorization tokens use a 64-byte JOSE ES256 signature", async () =>
   const client = createAPNsClient({
     teamId: "TEAM123456",
     keyId: "KEY1234567",
-    bundleId: "com.example.rimcodex",
+    bundleId: "com.example.pocketex",
     privateKey: privateKey.export({ type: "pkcs8", format: "pem" }),
     http2Connect() {
       return {
