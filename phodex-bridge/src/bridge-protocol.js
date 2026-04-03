@@ -234,6 +234,10 @@ function normalizeBridgeEventName(rawMethod) {
     return "bridge.event";
   }
 
+  if (isStructuredUserInputRequestMethod(normalizedMethod)) {
+    return "structured_user_input.requested";
+  }
+
   if (isApprovalRequestMethod(normalizedMethod)) {
     return "approval.requested";
   }
@@ -405,9 +409,12 @@ function extractTurnId(rawParams) {
   ]);
 }
 
+function isStructuredUserInputRequestMethod(method) {
+  return method === "item/tool/requestUserInput";
+}
+
 function isApprovalRequestMethod(method) {
-  return method === "item/tool/requestUserInput"
-    || method === "item/commandExecution/requestApproval"
+  return method === "item/commandExecution/requestApproval"
     || method === "item/command_execution/requestApproval"
     || method === "item/fileChange/requestApproval"
     || method.endsWith("requestApproval");
