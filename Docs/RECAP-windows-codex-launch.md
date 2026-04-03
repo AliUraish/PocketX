@@ -22,7 +22,7 @@ This task fixed a Windows startup bug in the local bridge. The bridge used to sp
 ## Logic Explanation
 
 ### Problem
-Windows users could have Codex installed and working in their terminal, but `remodex up` still failed with `spawn codex ENOENT`. The bridge assumed the same direct child-process launch worked everywhere, which is not true for the Windows `.cmd` launcher path.
+Windows users could have Codex installed and working in their terminal, but `pocketex up` still failed with `spawn codex ENOENT`. The bridge assumed the same direct child-process launch worked everywhere, which is not true for the Windows `.cmd` launcher path.
 
 ### Approach
 The fix keeps launch selection in one helper so the bridge chooses exactly one command based on `process.platform`. This is safer than trying several commands in sequence, because retries could create duplicate child processes and make shutdown messy.
@@ -63,6 +63,6 @@ flowchart TD
 
 ## High School Explanation
 
-Imagine Remodex is trying to open a game by double-clicking the launcher. On Mac and Linux, it can open the game app directly. On Windows, though, the thing called `codex` is often more like a shortcut file, so trying to open it the same way can fail even when the game is installed.
+Imagine Pocketex is trying to open a game by double-clicking the launcher. On Mac and Linux, it can open the game app directly. On Windows, though, the thing called `codex` is often more like a shortcut file, so trying to open it the same way can fail even when the game is installed.
 
-The fix teaches Remodex to use the right door for each computer. On Windows it now says, basically, "hey Command Prompt, please start Codex for me," which is the normal way that shortcut works. Then, when Remodex shuts down, it does not just close the front window and leave the game running in the background. It closes the whole stack cleanly.
+The fix teaches Pocketex to use the right door for each computer. On Windows it now says, basically, "hey Command Prompt, please start Codex for me," which is the normal way that shortcut works. Then, when Pocketex shuts down, it does not just close the front window and leave the game running in the background. It closes the whole stack cleanly.

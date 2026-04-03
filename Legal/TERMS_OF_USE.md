@@ -1,14 +1,14 @@
-# Remodex — Terms of Use
+# Pocketex — Terms of Use
 
 **Last updated:** March 25, 2026
 
-These Terms of Use ("Terms") govern your access to and use of the Remodex mobile application ("App"), developed and published by Emanuele Di Pietro ("Developer", "we", "us", or "our"). By downloading, installing, or using the App, you agree to these Terms. If you do not agree, do not use the App.
+These Terms of Use ("Terms") govern your access to and use of the Pocketex mobile application ("App"), developed and published by Emanuele Di Pietro ("Developer", "we", "us", or "our"). By downloading, installing, or using the App, you agree to these Terms. If you do not agree, do not use the App.
 
 ---
 
 ## 1. Description of the App
 
-Remodex is an iOS companion app for controlling a Codex runtime on your Mac. The App can connect to your Mac directly or through a developer-operated hosted relay. Core features include real-time chat, git actions, photo attachments, voice transcription, pairing, trusted reconnect, and subscription-gated functionality.
+Pocketex is an iOS companion app for controlling a Codex runtime on your Mac. The App can connect to your Mac directly or through a developer-operated hosted relay. Core features include real-time chat, git actions, photo attachments, voice transcription, pairing, trusted reconnect, and subscription-gated functionality.
 
 Most coding, repository, and workspace operations run on your paired Mac, not on our hosted relay.
 
@@ -18,7 +18,7 @@ You must be at least 13 years old, or the minimum age required in your jurisdict
 
 ## 3. Pairing and Security
 
-The App does not require a Remodex user account. Instead, it pairs with your Mac through a QR code flow and secure cryptographic session setup. You are responsible for keeping your paired devices secure and for activity performed through your paired environment.
+The App does not require a Pocketex user account. Instead, it pairs with your Mac through a QR code flow and secure cryptographic session setup. You are responsible for keeping your paired devices secure and for activity performed through your paired environment.
 
 ## 4. Pro Subscription
 
@@ -48,12 +48,12 @@ Feature availability can vary based on the connected runtime, platform limitatio
 
 ## 5. Developer-Operated Services
 
-To provide the App Store experience, Remodex may operate hosted services such as:
+To provide the App Store experience, Pocketex may operate hosted services such as:
 
 - a relay that routes traffic between your iPhone and paired Mac
 - a trusted reconnect endpoint
 
-These services are part of the Remodex product offering. They do not run Codex for you and do not replace your paired Mac runtime.
+These services are part of the Pocketex product offering. They do not run Codex for you and do not replace your paired Mac runtime.
 
 ## 6. Third-Party Services
 
@@ -77,11 +77,11 @@ You agree not to:
 
 ## 8. Open Source
 
-Remodex includes open-source code and is published in public source form. Source-code use is governed by the applicable repository license. These Terms apply to the distributed mobile application and any related services we operate for it.
+Pocketex includes open-source code and is published in public source form. Source-code use is governed by the applicable repository license. These Terms apply to the distributed mobile application and any related services we operate for it.
 
 ## 9. Intellectual Property
 
-The Remodex name, branding, and app presentation are owned by the Developer, except for third-party marks belonging to their respective owners. Nothing in these Terms grants you rights to our branding beyond normal use of the App.
+The Pocketex name, branding, and app presentation are owned by the Developer, except for third-party marks belonging to their respective owners. Nothing in these Terms grants you rights to our branding beyond normal use of the App.
 
 ## 10. Availability and Changes
 
@@ -128,5 +128,5 @@ If any provision of these Terms is found unenforceable, the remaining provisions
 If you have questions about these Terms, you can reach us at:
 
 - **Email:** emandipietro@gmail.com
-- **GitHub:** [github.com/Emanuele-web04/remodex](https://github.com/Emanuele-web04/remodex)
+- **GitHub:** [github.com/Emanuele-web04/pocketex](https://github.com/Emanuele-web04/pocketex)
 - **X (Twitter):** [@emanueledpt](https://x.com/emanueledpt)
