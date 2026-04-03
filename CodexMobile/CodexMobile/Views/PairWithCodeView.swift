@@ -55,7 +55,7 @@ struct PairWithCodeView: View {
                         .font(AppFont.system(size: 30, weight: .bold))
                         .foregroundStyle(.white)
 
-                    Text("Enter the relay URL and the short-lived pairing code shown by `rimcodex up` on your Mac.")
+                    Text("Enter the relay URL and the short-lived pairing code shown by `pocketex up` on your Mac.")
                         .font(AppFont.subheadline(weight: .regular))
                         .foregroundStyle(.white.opacity(0.62))
                         .fixedSize(horizontal: false, vertical: true)
