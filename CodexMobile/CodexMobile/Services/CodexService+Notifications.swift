@@ -21,6 +21,10 @@ private enum CodexBridgeNotificationEventType: String {
     case reconnectFailed = "reconnect_failed"
 }
 
+struct CodexPhoneOriginatedRunNotificationState {
+    var turnId: String? = nil
+}
+
 protocol CodexRemoteNotificationRegistering: AnyObject {
     func registerForRemoteNotifications()
 }
@@ -226,8 +230,16 @@ extension CodexService {
         }
     }
 
-    // Schedules a local alert only when a run finishes while the app is away from the foreground.
+    // Only phone-originated runs should notify, and completion still consumes the pending eligibility
+    // even when the user stayed in the foreground and saw the result inline.
     func notifyRunCompletionIfNeeded(threadId: String, turnId: String?, result: CodexRunCompletionResult) {
+        guard consumePhoneOriginatedRunNotificationEligibility(
+            threadId: threadId,
+            turnId: turnId
+        ) else {
+            return
+        }
+
         guard !isAppInForeground else {
             return
         }
@@ -517,14 +529,7 @@ private extension CodexService {
         runCompletionNotificationDedupedAt[dedupeKey] = now
 
         let title = thread(for: threadId)?.displayTitle ?? CodexThread.defaultDisplayTitle
-        let body: String = {
-            switch result {
-            case .completed:
-                "Response ready"
-            case .failed:
-                "Run failed"
-            }
-        }()
+        let body = runCompletionNotificationBody(threadId: threadId, result: result)
 
         let content = UNMutableNotificationContent()
         content.title = title
@@ -756,6 +761,36 @@ private extension CodexService {
         }
     }
 
+    func runCompletionNotificationBody(
+        threadId: String,
+        result: CodexRunCompletionResult
+    ) -> String {
+        switch result {
+        case .completed:
+            return truncatedNotificationPreview(syncLatestAssistantOutputCache(for: threadId))
+                ?? "Response ready"
+        case .failed:
+            return "Run failed"
+        }
+    }
+
+    func truncatedNotificationPreview(_ value: String, limit: Int = 160) -> String? {
+        let normalized = value
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            return nil
+        }
+
+        guard normalized.count > limit else {
+            return normalized
+        }
+
+        let prefix = String(normalized.prefix(max(0, limit - 1)))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(prefix)…"
+    }
+
     func structuredUserInputNotificationDedupeKey(
         threadId: String,
         requestID: JSONValue
@@ -776,7 +811,82 @@ private extension CodexService {
             now.timeIntervalSince(timestamp) <= 60
         }
     }
+}
 
+extension CodexService {
+    func rememberPhoneOriginatedRunNotificationEligibility(
+        threadId: String?,
+        turnId: String? = nil
+    ) {
+        guard let normalizedThreadId = normalizedInterruptIdentifier(threadId) else {
+            return
+        }
+
+        let normalizedTurnId = normalizedInterruptIdentifier(turnId)
+        var state = phoneOriginatedRunNotificationStateByThread[normalizedThreadId]
+            ?? CodexPhoneOriginatedRunNotificationState()
+        if let normalizedTurnId {
+            state.turnId = normalizedTurnId
+        }
+        phoneOriginatedRunNotificationStateByThread[normalizedThreadId] = state
+    }
+
+    func bindPhoneOriginatedRunNotificationEligibility(
+        turnId: String?,
+        for threadId: String?
+    ) {
+        guard let normalizedThreadId = normalizedInterruptIdentifier(threadId),
+              let normalizedTurnId = normalizedInterruptIdentifier(turnId),
+              phoneOriginatedRunNotificationStateByThread[normalizedThreadId] != nil else {
+            return
+        }
+
+        phoneOriginatedRunNotificationStateByThread[normalizedThreadId]?.turnId = normalizedTurnId
+    }
+
+    func clearPhoneOriginatedRunNotificationEligibility(
+        threadId: String?,
+        turnId: String? = nil
+    ) {
+        guard let normalizedThreadId = normalizedInterruptIdentifier(threadId) else {
+            return
+        }
+
+        guard let state = phoneOriginatedRunNotificationStateByThread[normalizedThreadId] else {
+            return
+        }
+
+        if let normalizedTurnId = normalizedInterruptIdentifier(turnId),
+           let stateTurnId = normalizedInterruptIdentifier(state.turnId),
+           stateTurnId != normalizedTurnId {
+            return
+        }
+
+        phoneOriginatedRunNotificationStateByThread.removeValue(forKey: normalizedThreadId)
+    }
+
+    @discardableResult
+    func consumePhoneOriginatedRunNotificationEligibility(
+        threadId: String?,
+        turnId: String? = nil
+    ) -> Bool {
+        guard let normalizedThreadId = normalizedInterruptIdentifier(threadId),
+              let state = phoneOriginatedRunNotificationStateByThread[normalizedThreadId] else {
+            return false
+        }
+
+        if let normalizedTurnId = normalizedInterruptIdentifier(turnId),
+           let stateTurnId = normalizedInterruptIdentifier(state.turnId),
+           stateTurnId != normalizedTurnId {
+            return false
+        }
+
+        phoneOriginatedRunNotificationStateByThread.removeValue(forKey: normalizedThreadId)
+        return true
+    }
+}
+
+private extension CodexService {
     func approvalNotificationDedupeKey(
         threadId: String,
         requestID: JSONValue
