@@ -179,7 +179,7 @@ final class GPTVoiceTranscriptionManager: ObservableObject {
         let wavData = Self.encodeWAV(samples: resampled, sampleRate: UInt32(Self.targetSampleRate))
 
         let fileURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("remodex-voice-\(UUID().uuidString)")
+            .appendingPathComponent("pocketex-voice-\(UUID().uuidString)")
             .appendingPathExtension("wav")
 
         do {
@@ -369,7 +369,7 @@ extension GPTVoiceTranscriptionManager {
             return try await transcribeOverride(wavData, token)
         }
 
-        let boundary = "rimcodex-\(UUID().uuidString)"
+        let boundary = "pocketex-\(UUID().uuidString)"
 
         var body = Data()
         body.appendUTF8("--\(boundary)\r\n")
