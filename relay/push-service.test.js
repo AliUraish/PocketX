@@ -110,6 +110,46 @@ test("push service sends one generic bridge event alert", async () => {
   assert.equal(sent[0].payload.requestId, "request-1");
 });
 
+test("push service maps structured input events to the structured input notification source", async () => {
+  const sent = [];
+  const service = createPushSessionService({
+    apnsClient: {
+      isConfigured: () => true,
+      async sendNotification(payload) {
+        sent.push(payload);
+      },
+    },
+    canRegisterSession: () => true,
+  });
+
+  await service.registerDevice({
+    sessionId: "session-input-1",
+    notificationSecret: "secret-input-1",
+    deviceToken: "aabbcc",
+    alertsEnabled: true,
+  });
+
+  await service.notifyEvent({
+    sessionId: "session-input-1",
+    notificationSecret: "secret-input-1",
+    eventType: "structured_user_input_needed",
+    threadId: "thread-input-1",
+    turnId: "turn-input-1",
+    dedupeKey: "structured-input-1",
+    eventPayload: {
+      requestId: "request-input-1",
+      questionCount: 2,
+    },
+  });
+
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].title, "rimcodex input needed");
+  assert.equal(sent[0].body, "Codex needs 2 answers to continue.");
+  assert.equal(sent[0].payload.source, "codex.structuredUserInput");
+  assert.equal(sent[0].payload.eventType, "structured_user_input_needed");
+  assert.equal(sent[0].payload.requestId, "request-input-1");
+});
+
 test("push service rejects registration when the relay session is not active", async () => {
   const service = createPushSessionService({
     apnsClient: {
@@ -186,6 +226,41 @@ test("push service rejects completion sends once the live relay session is gone"
     }),
     /active relay session/
   );
+});
+
+test("push service skips delivery while the iphone relay client is already connected", async () => {
+  const sent = [];
+  const service = createPushSessionService({
+    apnsClient: {
+      isConfigured: () => true,
+      async sendNotification(payload) {
+        sent.push(payload);
+      },
+    },
+    canRegisterSession: () => true,
+    shouldDeliverPush: () => false,
+  });
+
+  await service.registerDevice({
+    sessionId: "session-live-iphone",
+    notificationSecret: "secret-live-iphone",
+    deviceToken: "aabbcc",
+    alertsEnabled: true,
+  });
+
+  const result = await service.notifyCompletion({
+    sessionId: "session-live-iphone",
+    notificationSecret: "secret-live-iphone",
+    threadId: "thread-live-iphone",
+    dedupeKey: "done-live-iphone",
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    skipped: true,
+    reason: "iphone_connected",
+  });
+  assert.equal(sent.length, 0);
 });
 
 test("push service reloads registrations from persisted state after a restart", async () => {
