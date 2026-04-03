@@ -126,26 +126,26 @@ struct TurnToolbarContent: ToolbarContent {
             }
         }
 
-        if repoDiffTotals != nil || showsGitActions {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                if let repoDiffTotals {
-                    TurnToolbarDiffTotalsLabel(
-                        totals: repoDiffTotals,
-                        isLoading: isLoadingRepoDiff,
-                        onTap: onTapRepoDiff
-                    )
-                }
+        if let repoDiffTotals {
+            ToolbarItem(placement: .topBarTrailing) {
+                TurnToolbarDiffTotalsLabel(
+                    totals: repoDiffTotals,
+                    isLoading: isLoadingRepoDiff,
+                    onTap: onTapRepoDiff
+                )
+            }
+        }
 
-                if showsGitActions {
-                    TurnGitActionsToolbarButton(
-                        isEnabled: isGitActionEnabled,
-                        disabledActions: disabledGitActions,
-                        isRunningAction: isRunningGitAction,
-                        showsDiscardRuntimeChangesAndSync: showsDiscardRuntimeChangesAndSync,
-                        gitSyncState: gitSyncState,
-                        onSelect: onGitAction
-                    )
-                }
+        if showsGitActions {
+            ToolbarItem(placement: .topBarTrailing) {
+                TurnGitActionsToolbarButton(
+                    isEnabled: isGitActionEnabled,
+                    disabledActions: disabledGitActions,
+                    isRunningAction: isRunningGitAction,
+                    showsDiscardRuntimeChangesAndSync: showsDiscardRuntimeChangesAndSync,
+                    gitSyncState: gitSyncState,
+                    onSelect: onGitAction
+                )
             }
         }
     }
