@@ -13,7 +13,7 @@ function printPairingCode(pairingSession) {
   if (Number.isFinite(expiresAt)) {
     console.log(`Expires: ${new Date(expiresAt).toISOString()}`);
   }
-  console.log("\nOpen rimcodex on your iPhone, choose \"Pair with Code\", and enter this code.\n");
+  console.log("\nOpen pocketex on your iPhone, choose \"Pair with Code\", and enter this code.\n");
 }
 
 function formatPairingCode(value) {
