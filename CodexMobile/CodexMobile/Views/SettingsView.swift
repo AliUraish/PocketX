@@ -894,7 +894,7 @@ private struct SettingsBridgeVersionCard: View {
         }
 
         if installedVersion.compare(latestVersion, options: .numeric) == .orderedAscending {
-            return "A newer rimcodex package is available on npm."
+            return "A newer pocketex package is available on npm."
         }
 
         return "This Mac is running a different build than the current npm latest."
@@ -1016,7 +1016,7 @@ private struct SettingsAboutCard: View {
                 isShowingAbout = true
             } label: {
                 settingsAccessoryRow(
-                    title: "How rimcodex Works",
+                    title: "How pocketex Works",
                     leading: {
                         Image(systemName: "info.circle")
                             .font(AppFont.subheadline(weight: .medium))
@@ -1058,7 +1058,7 @@ private struct SettingsAboutCard: View {
             }
         }
         .fullScreenCover(isPresented: $isShowingAbout) {
-            AboutRimcodexView()
+            AboutPocketexView()
         }
     }
 
