@@ -1,5 +1,5 @@
 // FILE: GPTVoiceSetupSheet.swift
-// Purpose: Explains the Mac-side ChatGPT steps needed before rimcodex voice mode can work.
+// Purpose: Explains the Mac-side ChatGPT steps needed before pocketex voice mode can work.
 // Layer: View
 // Exports: GPTVoiceSetupSheet
 // Depends on: SwiftUI, AppFont
@@ -25,7 +25,7 @@ struct GPTVoiceSetupSheet: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("ChatGPT voice is checked on your Mac")
                             .font(AppFont.subheadline(weight: .semibold))
-                        Text("rimcodex reads the ChatGPT session from your paired Mac bridge.")
+                        Text("pocketex reads the ChatGPT session from your paired Mac bridge.")
                             .font(AppFont.caption())
                             .foregroundStyle(.secondary)
                     }
@@ -44,7 +44,7 @@ struct GPTVoiceSetupSheet: View {
                     )
                     setupStep(
                         number: "3",
-                        title: "Come back to rimcodex",
+                        title: "Come back to pocketex",
                         detail: "Keep the bridge connected, then try voice mode again after the status refreshes."
                     )
                 }
