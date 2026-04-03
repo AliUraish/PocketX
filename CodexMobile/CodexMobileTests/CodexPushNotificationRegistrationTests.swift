@@ -370,6 +370,39 @@ final class CodexPushNotificationRegistrationTests: XCTestCase {
         XCTAssertNil(service.missingNotificationThreadPrompt)
     }
 
+    func testRunCompletionNotificationUsesLatestAssistantMessagePreview() async {
+        let center = MockUserNotificationCenter(status: .authorized)
+        let registrar = MockRemoteNotificationRegistrar()
+        let service = makeService(
+            userNotificationCenter: center,
+            remoteNotificationRegistrar: registrar
+        )
+        service.isAppInForeground = false
+        service.threads = [CodexThread(id: "thread-preview", title: "Preview thread")]
+        service.messagesByThread["thread-preview"] = [
+            CodexMessage(
+                threadId: "thread-preview",
+                role: .assistant,
+                text: "Here is the answer you asked for."
+            ),
+        ]
+
+        service.rememberPhoneOriginatedRunNotificationEligibility(
+            threadId: "thread-preview",
+            turnId: "turn-preview"
+        )
+        service.notifyRunCompletionIfNeeded(
+            threadId: "thread-preview",
+            turnId: "turn-preview",
+            result: .completed
+        )
+        try? await Task.sleep(nanoseconds: 80_000_000)
+
+        XCTAssertEqual(center.addRequests.count, 1)
+        XCTAssertEqual(center.addRequests.last?.content.title, "Preview thread")
+        XCTAssertEqual(center.addRequests.last?.content.body, "Here is the answer you asked for.")
+    }
+
     private func makeService(
         userNotificationCenter: CodexUserNotificationCentering,
         remoteNotificationRegistrar: CodexRemoteNotificationRegistering
