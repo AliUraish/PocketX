@@ -26,7 +26,7 @@ const {
 const PAIRING_PROTOCOL_VERSION = 2;
 const PAIRING_QR_VERSION = PAIRING_PROTOCOL_VERSION;
 const SECURE_PROTOCOL_VERSION = 1;
-const HANDSHAKE_TAG = "rimcodex-e2ee-v1";
+const HANDSHAKE_TAG = "pocketex-e2ee-v1";
 const HANDSHAKE_MODE_PAIRING_BOOTSTRAP = "pairing_bootstrap";
 const HANDSHAKE_MODE_QR_BOOTSTRAP = HANDSHAKE_MODE_PAIRING_BOOTSTRAP;
 const HANDSHAKE_MODE_TRUSTED_RECONNECT = "trusted_reconnect";
@@ -95,7 +95,7 @@ function createBridgeSecureTransport({
       if (parsed.method || parsed.id != null) {
         sendControlMessage(createSecureError({
           code: "update_required",
-          message: "This bridge requires the latest rimcodex iPhone app for secure pairing.",
+          message: "This bridge requires the latest pocketex iPhone app for secure pairing.",
         }));
         return true;
       }
@@ -561,7 +561,7 @@ function createBridgeSecureTransport({
 }
 
 function debugSecureLog(message) {
-  console.log(`[rimcodex][secure] ${message}`);
+  console.log(`[pocketex][secure] ${message}`);
 }
 
 function shortId(value) {
