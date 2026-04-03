@@ -111,9 +111,9 @@ final class CodexGPTAccountTests: XCTestCase {
         XCTAssertEqual(service.latestBridgePackageVersion, "1.3.8")
         XCTAssertEqual(
             service.bridgeUpdatePrompt?.title,
-            "A newer Remodex update is available on your Mac"
+            "A newer Pocketex update is available on your Mac"
         )
-        XCTAssertEqual(service.bridgeUpdatePrompt?.command, "npm install -g remodex@latest")
+        XCTAssertEqual(service.bridgeUpdatePrompt?.command, "npm install -g pocketex@latest")
         XCTAssertEqual(service.gptAccountSnapshot.status, .unknown)
     }
 
@@ -208,7 +208,7 @@ final class CodexGPTAccountTests: XCTestCase {
         XCTAssertEqual(service.latestBridgePackageVersion, "1.3.8")
         XCTAssertEqual(
             service.bridgeUpdatePrompt?.title,
-            "A newer Remodex update is available on your Mac"
+            "A newer Pocketex update is available on your Mac"
         )
     }
 
@@ -580,7 +580,7 @@ final class CodexGPTAccountTests: XCTestCase {
 
         await XCTAssertThrowsErrorAsync({
             try await service.transcribeVoiceAudioFile(
-                at: URL(fileURLWithPath: "/tmp/remodex-voice-test.wav"),
+                at: URL(fileURLWithPath: "/tmp/pocketex-voice-test.wav"),
                 durationSeconds: 1
             )
         }) { error in
