@@ -7,10 +7,10 @@
 import Foundation
 
 enum AppEnvironment {
-    private static let defaultRelayURLInfoPlistKeys = ["RIMCODEX_DEFAULT_RELAY_URL", "PHODEX_DEFAULT_RELAY_URL"]
-    private static let sourceRepositoryURLInfoPlistKey = "RIMCODEX_SOURCE_REPOSITORY_URL"
-    private static let privacyPolicyURLInfoPlistKey = "RIMCODEX_PRIVACY_POLICY_URL"
-    private static let termsOfUseURLInfoPlistKey = "RIMCODEX_TERMS_OF_USE_URL"
+    private static let defaultRelayURLInfoPlistKeys = ["POCKETEX_DEFAULT_RELAY_URL", "PHODEX_DEFAULT_RELAY_URL"]
+    private static let sourceRepositoryURLInfoPlistKeys = ["POCKETEX_SOURCE_REPOSITORY_URL"]
+    private static let privacyPolicyURLInfoPlistKeys = ["POCKETEX_PRIVACY_POLICY_URL"]
+    private static let termsOfUseURLInfoPlistKeys = ["POCKETEX_TERMS_OF_USE_URL"]
     private static let revenueCatPublicAPIKeyInfoPlistKey = "REVENUECAT_PUBLIC_API_KEY"
     private static let revenueCatEntitlementNameInfoPlistKey = "REVENUECAT_ENTITLEMENT_NAME"
     private static let revenueCatDefaultOfferingIDInfoPlistKey = "REVENUECAT_DEFAULT_OFFERING_ID"
@@ -44,21 +44,21 @@ enum AppEnvironment {
     }
 
     static var sourceRepositoryURL: URL? {
-        guard let rawValue = resolvedString(forInfoPlistKey: sourceRepositoryURLInfoPlistKey) else {
+        guard let rawValue = resolvedString(forInfoPlistKeys: sourceRepositoryURLInfoPlistKeys) else {
             return nil
         }
         return URL(string: rawValue)
     }
 
     static var privacyPolicyURL: URL? {
-        guard let rawValue = resolvedString(forInfoPlistKey: privacyPolicyURLInfoPlistKey) else {
+        guard let rawValue = resolvedString(forInfoPlistKeys: privacyPolicyURLInfoPlistKeys) else {
             return nil
         }
         return URL(string: rawValue)
     }
 
     static var termsOfUseURL: URL? {
-        guard let rawValue = resolvedString(forInfoPlistKey: termsOfUseURLInfoPlistKey) else {
+        guard let rawValue = resolvedString(forInfoPlistKeys: termsOfUseURLInfoPlistKeys) else {
             return nil
         }
         return URL(string: rawValue)
@@ -66,6 +66,15 @@ enum AppEnvironment {
 }
 
 private extension AppEnvironment {
+    static func resolvedString(forInfoPlistKeys keys: [String]) -> String? {
+        for key in keys {
+            if let resolvedValue = resolvedString(forInfoPlistKey: key) {
+                return resolvedValue
+            }
+        }
+        return nil
+    }
+
     static func resolvedString(forInfoPlistKey key: String) -> String? {
         guard let rawValue = Bundle.main.object(forInfoDictionaryKey: key) as? String else {
             return nil
