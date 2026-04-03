@@ -50,7 +50,7 @@ struct TurnWorktreeHandoffOverlay: View {
     @FocusState private var isBranchNameFocused: Bool
 
     private var normalizedBranchName: String {
-        remodexNormalizedCreatedBranchName(branchName)
+        pocketexNormalizedCreatedBranchName(branchName)
     }
 
     private var trimmedBaseBranch: String {
