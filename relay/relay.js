@@ -1,5 +1,5 @@
 // FILE: relay.js
-// Purpose: Thin self-hostable WebSocket relay for rimcodex pairing, trusted-session lookup, and encrypted forwarding.
+// Purpose: Thin self-hostable WebSocket relay for pocketex pairing, trusted-session lookup, and encrypted forwarding.
 // Layer: Standalone server module
 // Exports: setupRelay, getRelayStats, hasActiveMacSession, hasAuthenticatedMacSession, resolveTrustedMacSession, claimPairingCode
 
@@ -12,7 +12,7 @@ const CLOSE_CODE_SESSION_UNAVAILABLE = 4002;
 const CLOSE_CODE_IPHONE_REPLACED = 4003;
 const CLOSE_CODE_MAC_ABSENCE_BUFFER_FULL = 4004;
 const MAC_ABSENCE_GRACE_MS = 15_000;
-const TRUSTED_SESSION_RESOLVE_TAG = "rimcodex-trusted-session-resolve-v1";
+const TRUSTED_SESSION_RESOLVE_TAG = "pocketex-trusted-session-resolve-v1";
 const TRUSTED_SESSION_RESOLVE_SKEW_MS = 90_000;
 
 // In-memory session registry for one Mac host and one live iPhone client per session.
