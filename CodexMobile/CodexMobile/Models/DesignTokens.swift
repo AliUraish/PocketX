@@ -37,5 +37,13 @@ enum DesignTokens {
 
         // Git sync status indicator
         static let gitSyncWarning = Color.orange
+
+        // Theme surface colors
+        static let chatBackground = Color(red: 13.0 / 255.0, green: 10.0 / 255.0, blue: 20.0 / 255.0)
+        static let cardBackground = Color(red: 19.0 / 255.0, green: 16.0 / 255.0, blue: 28.0 / 255.0)
+        static let inputBackground = Color(red: 26.0 / 255.0, green: 21.0 / 255.0, blue: 40.0 / 255.0)
+        static let cardBorder = Color(red: 35.0 / 255.0, green: 29.0 / 255.0, blue: 53.0 / 255.0)
+        static let selectedBorder = Color(red: 61.0 / 255.0, green: 46.0 / 255.0, blue: 107.0 / 255.0)
+        static let glassAccent = Color(red: 1.0, green: 107.0 / 255.0, blue: 26.0 / 255.0)
     }
 }
