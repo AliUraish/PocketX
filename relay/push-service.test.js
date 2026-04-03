@@ -16,8 +16,19 @@ const {
   resolvePushStateFilePath,
 } = require("./push-service");
 
+function createIsolatedPushSessionService(options = {}) {
+  const { stateStore, ...rest } = options;
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pocketex-push-state-"));
+  return createPushSessionService({
+    ...rest,
+    stateStore: stateStore || createFileBackedPushStateStore({
+      stateFilePath: path.join(tempDir, "push-state.json"),
+    }),
+  });
+}
+
 test("push service stores device registration and sends one completion alert", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "rimcodex-push-state-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pocketex-push-state-"));
   const sent = [];
   const service = createPushSessionService({
     apnsClient: {
@@ -65,7 +76,7 @@ test("push service stores device registration and sends one completion alert", a
 
 test("push service sends one generic bridge event alert", async () => {
   const sent = [];
-  const service = createPushSessionService({
+  const service = createIsolatedPushSessionService({
     apnsClient: {
       isConfigured: () => true,
       async sendNotification(payload) {
@@ -89,7 +100,7 @@ test("push service sends one generic bridge event alert", async () => {
     threadId: "thread-event-1",
     turnId: "turn-event-1",
     dedupeKey: "approval-1",
-    title: "rimcodex approval needed",
+    title: "pocketex approval needed",
     body: "Approval needed to continue the run.",
     eventPayload: {
       requestId: "request-1",
@@ -112,7 +123,7 @@ test("push service sends one generic bridge event alert", async () => {
 
 test("push service maps structured input events to the structured input notification source", async () => {
   const sent = [];
-  const service = createPushSessionService({
+  const service = createIsolatedPushSessionService({
     apnsClient: {
       isConfigured: () => true,
       async sendNotification(payload) {
@@ -143,7 +154,7 @@ test("push service maps structured input events to the structured input notifica
   });
 
   assert.equal(sent.length, 1);
-  assert.equal(sent[0].title, "rimcodex input needed");
+  assert.equal(sent[0].title, "pocketex input needed");
   assert.equal(sent[0].body, "Codex needs 2 answers to continue.");
   assert.equal(sent[0].payload.source, "codex.structuredUserInput");
   assert.equal(sent[0].payload.eventType, "structured_user_input_needed");
@@ -151,7 +162,7 @@ test("push service maps structured input events to the structured input notifica
 });
 
 test("push service rejects registration when the relay session is not active", async () => {
-  const service = createPushSessionService({
+  const service = createIsolatedPushSessionService({
     apnsClient: {
       isConfigured: () => true,
       async sendNotification() {},
@@ -171,7 +182,7 @@ test("push service rejects registration when the relay session is not active", a
 });
 
 test("push service rejects mismatched notification secrets", async () => {
-  const service = createPushSessionService({
+  const service = createIsolatedPushSessionService({
     apnsClient: {
       isConfigured: () => true,
       async sendNotification() {},
@@ -199,7 +210,7 @@ test("push service rejects mismatched notification secrets", async () => {
 
 test("push service rejects completion sends once the live relay session is gone", async () => {
   let sessionIsLive = true;
-  const service = createPushSessionService({
+  const service = createIsolatedPushSessionService({
     apnsClient: {
       isConfigured: () => true,
       async sendNotification() {},
@@ -230,7 +241,7 @@ test("push service rejects completion sends once the live relay session is gone"
 
 test("push service skips delivery while the iphone relay client is already connected", async () => {
   const sent = [];
-  const service = createPushSessionService({
+  const service = createIsolatedPushSessionService({
     apnsClient: {
       isConfigured: () => true,
       async sendNotification(payload) {
@@ -264,7 +275,7 @@ test("push service skips delivery while the iphone relay client is already conne
 });
 
 test("push service reloads registrations from persisted state after a restart", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "rimcodex-push-state-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pocketex-push-state-"));
   const stateFilePath = path.join(tempDir, "push-state.json");
   const firstSent = [];
 
@@ -310,17 +321,17 @@ test("push service reloads registrations from persisted state after a restart", 
   assert.equal(fs.statSync(stateFilePath).mode & 0o777, 0o600);
 });
 
-test("push service defaults to a durable state file in the rimcodex home dir", () => {
+test("push service defaults to a durable state file in the pocketex home dir", () => {
   const resolved = resolvePushStateFilePath({
     CODEX_HOME: "/tmp/codex-home",
   });
 
-  assert.equal(resolved, "/tmp/codex-home/rimcodex/push-state.json");
+  assert.equal(resolved, "/tmp/codex-home/pocketex/push-state.json");
 });
 
 test("push service keeps working when state persistence fails", async () => {
   const sent = [];
-  const service = createPushSessionService({
+  const service = createIsolatedPushSessionService({
     apnsClient: {
       isConfigured: () => true,
       async sendNotification(payload) {
