@@ -25,10 +25,10 @@ final class CodexThreadForkTests: XCTestCase {
                 return RPCMessage(
                     id: .string(UUID().uuidString),
                     result: .object([
-                        "cwd": .string("/tmp/remodex"),
+                        "cwd": .string("/tmp/pocketex"),
                         "thread": .object([
                             "id": .string("fork-local"),
-                            "cwd": .string("/tmp/remodex"),
+                            "cwd": .string("/tmp/pocketex"),
                             "title": .string("Fork Local"),
                         ]),
                     ]),
@@ -40,7 +40,7 @@ final class CodexThreadForkTests: XCTestCase {
                     result: .object([
                         "thread": .object([
                             "id": .string("fork-local"),
-                            "cwd": .string("/tmp/remodex"),
+                            "cwd": .string("/tmp/pocketex"),
                             "title": .string("Fork Local"),
                         ]),
                     ]),
@@ -55,12 +55,12 @@ final class CodexThreadForkTests: XCTestCase {
         let forkedThread = try await service.forkThreadIfReady(from: "source-thread", target: .currentProject)
 
         XCTAssertEqual(capturedForkParams["threadId"]?.stringValue, "source-thread")
-        XCTAssertEqual(capturedForkParams["cwd"]?.stringValue, "/tmp/remodex")
+        XCTAssertEqual(capturedForkParams["cwd"]?.stringValue, "/tmp/pocketex")
         XCTAssertEqual(capturedForkParams["model"]?.stringValue, "gpt-5.4")
         XCTAssertEqual(capturedForkParams["modelProvider"]?.stringValue, "openai")
         XCTAssertEqual(service.activeThreadId, "fork-local")
         XCTAssertEqual(forkedThread.id, "fork-local")
-        XCTAssertEqual(service.thread(for: "fork-local")?.gitWorkingDirectory, "/tmp/remodex")
+        XCTAssertEqual(service.thread(for: "fork-local")?.gitWorkingDirectory, "/tmp/pocketex")
     }
 
     func testWorktreeForkUsesProvidedProjectPath() async throws {
@@ -77,10 +77,10 @@ final class CodexThreadForkTests: XCTestCase {
                 return RPCMessage(
                     id: .string(UUID().uuidString),
                     result: .object([
-                        "cwd": .string("/tmp/remodex-worktree"),
+                        "cwd": .string("/tmp/pocketex-worktree"),
                         "thread": .object([
                             "id": .string("fork-worktree"),
-                            "cwd": .string("/tmp/remodex-worktree"),
+                            "cwd": .string("/tmp/pocketex-worktree"),
                             "title": .string("Fork Worktree"),
                         ]),
                     ]),
@@ -92,7 +92,7 @@ final class CodexThreadForkTests: XCTestCase {
                     result: .object([
                         "thread": .object([
                             "id": .string("fork-worktree"),
-                            "cwd": .string("/tmp/remodex-worktree"),
+                            "cwd": .string("/tmp/pocketex-worktree"),
                             "title": .string("Fork Worktree"),
                         ]),
                     ]),
@@ -106,11 +106,11 @@ final class CodexThreadForkTests: XCTestCase {
 
         let forkedThread = try await service.forkThreadIfReady(
             from: "source-thread",
-            target: .projectPath("/tmp/remodex-worktree")
+            target: .projectPath("/tmp/pocketex-worktree")
         )
 
-        XCTAssertEqual(capturedForkParams["cwd"]?.stringValue, "/tmp/remodex-worktree")
-        XCTAssertEqual(forkedThread.gitWorkingDirectory, "/tmp/remodex-worktree")
+        XCTAssertEqual(capturedForkParams["cwd"]?.stringValue, "/tmp/pocketex-worktree")
+        XCTAssertEqual(forkedThread.gitWorkingDirectory, "/tmp/pocketex-worktree")
     }
 
     func testForkStillReturnsCreatedThreadWhenHydrationFails() async throws {
@@ -127,10 +127,10 @@ final class CodexThreadForkTests: XCTestCase {
                 return RPCMessage(
                     id: .string(UUID().uuidString),
                     result: .object([
-                        "cwd": .string("/tmp/remodex-worktree"),
+                        "cwd": .string("/tmp/pocketex-worktree"),
                         "thread": .object([
                             "id": .string("fork-partial"),
-                            "cwd": .string("/tmp/remodex-worktree"),
+                            "cwd": .string("/tmp/pocketex-worktree"),
                             "title": .string("Fork Partial"),
                         ]),
                     ]),
@@ -146,14 +146,14 @@ final class CodexThreadForkTests: XCTestCase {
 
         let forkedThread = try await service.forkThreadIfReady(
             from: "source-thread",
-            target: .projectPath("/tmp/remodex-worktree")
+            target: .projectPath("/tmp/pocketex-worktree")
         )
 
         XCTAssertEqual(requestedMethods, ["thread/fork", "thread/resume"])
         XCTAssertEqual(forkedThread.id, "fork-partial")
-        XCTAssertEqual(forkedThread.gitWorkingDirectory, "/tmp/remodex-worktree")
+        XCTAssertEqual(forkedThread.gitWorkingDirectory, "/tmp/pocketex-worktree")
         XCTAssertEqual(service.activeThreadId, "fork-partial")
-        XCTAssertEqual(service.thread(for: "fork-partial")?.gitWorkingDirectory, "/tmp/remodex-worktree")
+        XCTAssertEqual(service.thread(for: "fork-partial")?.gitWorkingDirectory, "/tmp/pocketex-worktree")
     }
 
     func testForkMarksCreatedThreadAsForkedFromSource() async throws {
@@ -170,7 +170,7 @@ final class CodexThreadForkTests: XCTestCase {
                     result: .object([
                         "thread": .object([
                             "id": .string("fork-local"),
-                            "cwd": .string("/tmp/remodex"),
+                            "cwd": .string("/tmp/pocketex"),
                             "title": .string("Fork Local"),
                         ]),
                     ]),
@@ -182,7 +182,7 @@ final class CodexThreadForkTests: XCTestCase {
                     result: .object([
                         "thread": .object([
                             "id": .string("fork-local"),
-                            "cwd": .string("/tmp/remodex"),
+                            "cwd": .string("/tmp/pocketex"),
                             "title": .string("Fork Local"),
                         ]),
                     ]),
@@ -215,7 +215,7 @@ final class CodexThreadForkTests: XCTestCase {
                     result: .object([
                         "thread": .object([
                             "id": .string("fork-local"),
-                            "cwd": .string("/tmp/remodex"),
+                            "cwd": .string("/tmp/pocketex"),
                             "title": .string("Fork Local"),
                         ]),
                     ]),
@@ -257,7 +257,7 @@ final class CodexThreadForkTests: XCTestCase {
                     result: .object([
                         "thread": .object([
                             "id": .string("fork-local"),
-                            "cwd": .string("/tmp/remodex"),
+                            "cwd": .string("/tmp/pocketex"),
                             "title": .string("Fork Local"),
                         ]),
                     ]),
@@ -269,7 +269,7 @@ final class CodexThreadForkTests: XCTestCase {
                     result: .object([
                         "thread": .object([
                             "id": .string("fork-local"),
-                            "cwd": .string("/tmp/remodex"),
+                            "cwd": .string("/tmp/pocketex"),
                             "title": .string("Fork Local"),
                         ]),
                     ]),
@@ -288,7 +288,7 @@ final class CodexThreadForkTests: XCTestCase {
             CodexThread(
                 id: "fork-local",
                 title: "Fork Local",
-                cwd: "/tmp/remodex"
+                cwd: "/tmp/pocketex"
             )
         )
 
@@ -323,7 +323,7 @@ final class CodexThreadForkTests: XCTestCase {
                     result: .object([
                         "thread": .object([
                             "id": .string("fork-minimal"),
-                            "cwd": .string("/tmp/remodex"),
+                            "cwd": .string("/tmp/pocketex"),
                             "title": .string("Fork Minimal"),
                         ]),
                     ]),
@@ -336,7 +336,7 @@ final class CodexThreadForkTests: XCTestCase {
                     result: .object([
                         "thread": .object([
                             "id": .string("fork-minimal"),
-                            "cwd": .string("/tmp/remodex-worktree"),
+                            "cwd": .string("/tmp/pocketex-worktree"),
                             "title": .string("Fork Minimal"),
                         ]),
                     ]),
@@ -350,11 +350,11 @@ final class CodexThreadForkTests: XCTestCase {
 
         let forkedThread = try await service.forkThreadIfReady(
             from: "source-thread",
-            target: .projectPath("/tmp/remodex-worktree")
+            target: .projectPath("/tmp/pocketex-worktree")
         )
 
         XCTAssertEqual(forkRequests.count, 2)
-        XCTAssertEqual(forkRequests.first?["cwd"]?.stringValue, "/tmp/remodex-worktree")
+        XCTAssertEqual(forkRequests.first?["cwd"]?.stringValue, "/tmp/pocketex-worktree")
         XCTAssertEqual(forkRequests.first?["modelProvider"]?.stringValue, "openai")
         XCTAssertEqual(forkRequests.last?["threadId"]?.stringValue, "source-thread")
         XCTAssertNil(forkRequests.last?["cwd"])
@@ -362,10 +362,10 @@ final class CodexThreadForkTests: XCTestCase {
         XCTAssertNil(forkRequests.last?["modelProvider"])
         XCTAssertEqual(resumeRequests.count, 1)
         XCTAssertEqual(resumeRequests.first?["threadId"]?.stringValue, "fork-minimal")
-        XCTAssertEqual(resumeRequests.first?["cwd"]?.stringValue, "/tmp/remodex-worktree")
+        XCTAssertEqual(resumeRequests.first?["cwd"]?.stringValue, "/tmp/pocketex-worktree")
         XCTAssertEqual(resumeRequests.first?["model"]?.stringValue, "gpt-5.4")
-        XCTAssertEqual(forkedThread.gitWorkingDirectory, "/tmp/remodex-worktree")
-        XCTAssertEqual(service.thread(for: "fork-minimal")?.gitWorkingDirectory, "/tmp/remodex-worktree")
+        XCTAssertEqual(forkedThread.gitWorkingDirectory, "/tmp/pocketex-worktree")
+        XCTAssertEqual(service.thread(for: "fork-minimal")?.gitWorkingDirectory, "/tmp/pocketex-worktree")
     }
 
     func testForkDoesNotFallbackWhenOverrideValueIsUnsupported() async {
@@ -386,7 +386,7 @@ final class CodexThreadForkTests: XCTestCase {
         do {
             _ = try await service.forkThreadIfReady(
                 from: "source-thread",
-                target: .projectPath("/tmp/remodex-worktree")
+                target: .projectPath("/tmp/pocketex-worktree")
             )
             XCTFail("Expected unsupported model value to fail without retry")
         } catch {
@@ -412,12 +412,12 @@ final class CodexThreadForkTests: XCTestCase {
             XCTFail("Expected thread/fork to fail")
         } catch {
             XCTAssertFalse(service.supportsThreadFork)
-            XCTAssertEqual(service.bridgeUpdatePrompt?.title, "Update Remodex on your Mac to use /fork")
+            XCTAssertEqual(service.bridgeUpdatePrompt?.title, "Update Pocketex on your Mac to use /fork")
             XCTAssertEqual(
                 service.bridgeUpdatePrompt?.message,
-                "This Mac bridge does not support native conversation forks yet. Update the Remodex npm package to use /fork and worktree fork flows."
+                "This Mac bridge does not support native conversation forks yet. Update the Pocketex npm package to use /fork and worktree fork flows."
             )
-            XCTAssertEqual(service.bridgeUpdatePrompt?.command, "npm install -g remodex@latest")
+            XCTAssertEqual(service.bridgeUpdatePrompt?.command, "npm install -g pocketex@latest")
         }
     }
 
@@ -457,10 +457,10 @@ final class CodexThreadForkTests: XCTestCase {
 
         let localForkPath = TurnThreadForkCoordinator.localForkProjectPath(
             for: worktreeThread,
-            localCheckoutPath: "/Users/emanueledipietro/Developer/Remodex/phodex-website"
+            localCheckoutPath: "/Users/emanueledipietro/Developer/Pocketex/phodex-website"
         )
 
-        XCTAssertEqual(localForkPath, "/Users/emanueledipietro/Developer/Remodex/phodex-website")
+        XCTAssertEqual(localForkPath, "/Users/emanueledipietro/Developer/Pocketex/phodex-website")
     }
 
     func testLocalForkIsUnavailableWhenCurrentWorktreeHasBeenRemoved() {
@@ -523,7 +523,7 @@ final class CodexThreadForkTests: XCTestCase {
         CodexThread(
             id: "source-thread",
             title: "Source",
-            cwd: "/tmp/remodex",
+            cwd: "/tmp/pocketex",
             model: "gpt-5.4",
             modelProvider: "openai"
         )
