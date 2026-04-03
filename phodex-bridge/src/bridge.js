@@ -57,7 +57,7 @@ const RELAY_WATCHDOG_STALE_AFTER_MS = 25_000;
 const BRIDGE_STATUS_HEARTBEAT_INTERVAL_MS = 5_000;
 const PENDING_BRIDGE_REQUEST_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 const STALE_RELAY_STATUS_MESSAGE = "Relay heartbeat stalled; reconnect pending.";
-const RELAY_HISTORY_IMAGE_REFERENCE_URL = "rimcodex://history-image-elided";
+const RELAY_HISTORY_IMAGE_REFERENCE_URL = "pocketex://history-image-elided";
 
 function startBridge({
   config: explicitConfig = null,
@@ -70,8 +70,8 @@ function startBridge({
   const config = explicitConfig || readBridgeConfig();
   const relayBaseUrl = config.relayUrl.replace(/\/+$/, "");
   if (!relayBaseUrl) {
-    console.error("[rimcodex] No relay URL configured.");
-    console.error("[rimcodex] In a source checkout, run ./run-local-rimcodex.sh or set RIMCODEX_RELAY.");
+    console.error("[pocketex] No relay URL configured.");
+    console.error("[pocketex] In a source checkout, run ./run-local-pocketex.sh or set POCKETEX_RELAY.");
     process.exit(1);
   }
 
@@ -79,7 +79,7 @@ function startBridge({
   try {
     deviceState = loadOrCreateBridgeDeviceState();
   } catch (error) {
-    console.error(`[rimcodex] ${(error && error.message) || "Failed to load the saved bridge pairing state."}`);
+    console.error(`[pocketex] ${(error && error.message) || "Failed to load the saved bridge pairing state."}`);
     process.exit(1);
   }
   const relaySession = resolveBridgeRelaySession(deviceState);
@@ -202,7 +202,7 @@ function startBridge({
   const codex = createCodexTransport({
     endpoint: config.codexEndpoint,
     env: process.env,
-    logPrefix: "[rimcodex]",
+    logPrefix: "[pocketex]",
   });
   const readBridgeRuntimeCapabilities = createBridgeRuntimeCapabilitiesReader({
     sendCodexRequest,
@@ -210,7 +210,7 @@ function startBridge({
   });
   const voiceHandler = createVoiceHandler({
     sendCodexRequest,
-    logPrefix: "[rimcodex]",
+    logPrefix: "[pocketex]",
   });
   startBridgeStatusHeartbeat();
   publishCurrentBridgeStatus({
@@ -230,14 +230,14 @@ function startBridge({
       lastError: error.message,
     });
     if (config.codexEndpoint) {
-      console.error(`[rimcodex] Failed to connect to Codex endpoint: ${config.codexEndpoint}`);
+      console.error(`[pocketex] Failed to connect to Codex endpoint: ${config.codexEndpoint}`);
       console.error(error.message);
       process.exit(1);
       return;
     }
 
-    console.error("[rimcodex] Local `codex app-server` is unavailable.");
-    console.error(`[rimcodex] Launch command: ${codex.describe()}`);
+    console.error("[pocketex] Local `codex app-server` is unavailable.");
+    console.error(`[pocketex] Launch command: ${codex.describe()}`);
     console.error(error.message);
     appendBridgeEvent({
       type: "codex.runtime_error",
@@ -247,7 +247,7 @@ function startBridge({
     });
     void notifyBridgePushEvent({
       eventType: "reconnect_failed",
-      title: "rimcodex reconnect failed",
+      title: "pocketex reconnect failed",
       body: "Codex on your Mac is unavailable.",
       dedupeKey: `reconnect-failed:codex:${Math.floor(Date.now() / 30_000)}`,
       eventPayload: {
@@ -277,7 +277,7 @@ function startBridge({
         lastError: codexSupervisorLastError,
       });
       console.error(
-        `[rimcodex] Local \`codex app-server\` exited; retrying in ${Math.max(
+        `[pocketex] Local \`codex app-server\` exited; retrying in ${Math.max(
           0,
           Number(event?.restartDelayMs) || 0
         )}ms.`
@@ -386,7 +386,7 @@ function startBridge({
       }
 
       if (hasRelayConnectionGoneStale(lastRelayActivityAt)) {
-        console.warn("[rimcodex] relay heartbeat stalled; forcing reconnect");
+        console.warn("[pocketex] relay heartbeat stalled; forcing reconnect");
         appendBridgeEvent({
           type: "relay.heartbeat_stalled",
           level: "warning",
@@ -432,7 +432,7 @@ function startBridge({
     if (status === "connected" && previousStatus && previousStatus !== "connected") {
       void notifyBridgePushEvent({
         eventType: "reconnect_succeeded",
-        title: "rimcodex reconnected",
+        title: "pocketex reconnected",
         body: "Your Mac bridge is reachable again.",
         dedupeKey: `reconnect-succeeded:${Math.floor(Date.now() / 30_000)}`,
         eventPayload: {
@@ -443,7 +443,7 @@ function startBridge({
     } else if (status === "disconnected" && previousStatus === "connected") {
       void notifyBridgePushEvent({
         eventType: "bridge_offline",
-        title: "rimcodex went offline",
+        title: "pocketex went offline",
         body: "The Mac bridge lost its relay connection.",
         dedupeKey: `bridge-offline:${Math.floor(Date.now() / 30_000)}`,
         eventPayload: {
@@ -452,7 +452,7 @@ function startBridge({
         },
       });
     }
-    console.log(`[rimcodex] ${status}`);
+    console.log(`[pocketex] ${status}`);
   }
 
   // Retries the relay socket while preserving the active Codex process and session id.
@@ -604,7 +604,7 @@ function startBridge({
   appendBridgeEvent({
     type: "bridge.started",
     level: "info",
-    message: "Started the rimcodex bridge.",
+    message: "Started the pocketex bridge.",
     detail: config.codexEndpoint
       ? "Using an existing Codex endpoint."
       : "Using a supervised local codex app-server.",
@@ -1376,7 +1376,7 @@ function startBridge({
         eventPayload: eventPayload && typeof eventPayload === "object" ? eventPayload : undefined,
       });
     } catch (error) {
-      console.error(`[rimcodex] push event notify failed: ${error.message}`);
+      console.error(`[pocketex] push event notify failed: ${error.message}`);
     }
   }
 
@@ -1899,7 +1899,7 @@ function describePendingBridgeRequest(trackedRequest) {
         eventType: "structured_user_input_needed",
         threadId,
         turnId,
-        title: "rimcodex input needed",
+        title: "pocketex input needed",
         body: buildStructuredUserInputNotificationBody(questionCount),
         dedupeKey: `structured-user-input:${requestId}`,
         eventPayload: {
@@ -1925,7 +1925,7 @@ function describePendingBridgeRequest(trackedRequest) {
       eventType: "approval_needed",
       threadId,
       turnId,
-      title: "rimcodex approval needed",
+      title: "pocketex approval needed",
       body: reason || "Approval needed to continue the run.",
       dedupeKey: `approval-needed:${requestId}`,
       eventPayload: {
