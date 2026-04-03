@@ -696,6 +696,7 @@ function startBridge({
     forgetResolvedBridgeInboundRequest(rawMessage);
     desktopRefresher.handleInbound(rawMessage);
     rolloutLiveMirror?.observeInbound(rawMessage);
+    pushNotificationTracker.handleInbound(rawMessage);
     rememberForwardedRequestMethod(rawMessage);
     rememberThreadFromMessage("phone", rawMessage);
     codex.send(rawMessage);
@@ -816,6 +817,7 @@ function startBridge({
     rememberForwardedBridgeProtocolRequest(requestId, method, codexMethod);
     desktopRefresher.handleInbound(forwardedMessage);
     rolloutLiveMirror?.observeInbound(forwardedMessage);
+    pushNotificationTracker.handleInbound(forwardedMessage);
     rememberThreadFromMessage("phone", forwardedMessage);
 
     try {
@@ -1514,33 +1516,17 @@ function startBridge({
       createdAt: Date.now(),
     };
     pendingBridgeInboundRequestsById.set(String(requestId), trackedRequest);
-    if (isBridgeApprovalMethod(method)) {
+    const requestAttention = describePendingBridgeRequest(trackedRequest);
+    if (requestAttention?.kind === "approval") {
       approvalState.rememberPendingApproval({
         ...trackedRequest,
         command: readString(trackedRequest.params?.command),
         reason: readString(trackedRequest.params?.reason),
       });
-      appendBridgeEvent({
-        type: "approval.requested",
-        level: "warning",
-        message: "A run is waiting for approval.",
-        detail: readString(trackedRequest.params?.reason) || null,
-        metadata: {
-          threadId: trackedRequest.threadId || null,
-          turnId: trackedRequest.turnId || null,
-        },
-      });
-      void notifyBridgePushEvent({
-        eventType: "approval_needed",
-        threadId: trackedRequest.threadId || null,
-        turnId: trackedRequest.turnId || null,
-        title: "rimcodex approval needed",
-        body: readString(trackedRequest.params?.reason) || "Approval needed to continue the run.",
-        dedupeKey: `approval-needed:${requestId}`,
-        eventPayload: {
-          requestId: trackedRequest.requestId,
-        },
-      });
+    }
+    if (requestAttention) {
+      appendBridgeEvent(buildPendingBridgeRequestLifecycleEvent(requestAttention, "requested"));
+      void notifyBridgePushEvent(requestAttention.pushEvent);
     }
     publishBridgeHealthSnapshotIfNeeded();
   }
@@ -1554,19 +1540,25 @@ function startBridge({
     const requestId = String(parsed.id);
     const pendingRequest = pendingBridgeInboundRequestsById.get(requestId);
     pendingBridgeInboundRequestsById.delete(requestId);
-    if (pendingRequest && isBridgeApprovalMethod(pendingRequest.method)) {
+    const requestAttention = describePendingBridgeRequest(pendingRequest);
+    if (requestAttention?.kind === "approval") {
       approvalState.resolvePendingApproval(requestId, parsed.result, {
         outcome: parsed.error ? "response_error_forwarded" : "response_forwarded",
       });
+    }
+    if (!parsed.error && pendingRequest?.threadId) {
+      pushNotificationTracker.markPhoneOriginatedRun({
+        threadId: pendingRequest.threadId,
+        turnId: pendingRequest.turnId || null,
+      });
+    }
+    if (requestAttention) {
       appendBridgeEvent({
-        type: "approval.resolved",
+        ...buildPendingBridgeRequestLifecycleEvent(requestAttention, "resolved"),
         level: parsed.error ? "warning" : "info",
-        message: "Resolved a pending approval.",
-        detail: parsed.error ? "The approval completed with an error response." : null,
-        metadata: {
-          threadId: pendingRequest.threadId || null,
-          turnId: pendingRequest.turnId || null,
-        },
+        detail: parsed.error
+          ? buildPendingBridgeRequestResolvedDetail(requestAttention)
+          : null,
       });
       publishBridgeHealthSnapshotIfNeeded();
     }
@@ -1582,17 +1574,12 @@ function startBridge({
     for (const [requestId, trackedRequest] of pendingBridgeInboundRequestsById.entries()) {
       if (!trackedRequest || (now - trackedRequest.createdAt) >= PENDING_BRIDGE_REQUEST_STALE_AFTER_MS) {
         pendingBridgeInboundRequestsById.delete(requestId);
-        if (trackedRequest && isBridgeApprovalMethod(trackedRequest.method)) {
+        const requestAttention = describePendingBridgeRequest(trackedRequest);
+        if (requestAttention?.kind === "approval") {
           approvalState.expirePendingApproval(requestId, "stale_timeout");
-          appendBridgeEvent({
-            type: "approval.expired",
-            level: "warning",
-            message: "Expired a stale pending approval.",
-            metadata: {
-              threadId: trackedRequest.threadId || null,
-              turnId: trackedRequest.turnId || null,
-            },
-          });
+        }
+        if (requestAttention) {
+          appendBridgeEvent(buildPendingBridgeRequestLifecycleEvent(requestAttention, "expired"));
         }
       }
     }
@@ -1656,6 +1643,10 @@ function startBridge({
       result,
     }));
     pendingBridgeInboundRequestsById.delete(requestId);
+    pushNotificationTracker.markPhoneOriginatedRun({
+      threadId: pendingRequest.threadId || null,
+      turnId: pendingRequest.turnId || null,
+    });
     approvalState.resolvePendingApproval(requestId, result, {
       outcome: "resolved_from_phone",
     });
@@ -1872,11 +1863,177 @@ function normalizeNonEmptyString(value) {
 }
 
 function isBridgeApprovalMethod(method) {
-  return method === "item/tool/requestUserInput"
-    || method === "item/commandExecution/requestApproval"
+  return method === "item/commandExecution/requestApproval"
     || method === "item/command_execution/requestApproval"
     || method === "item/fileChange/requestApproval"
     || (typeof method === "string" && method.endsWith("requestApproval"));
+}
+
+function isStructuredUserInputMethod(method) {
+  return method === "item/tool/requestUserInput";
+}
+
+function describePendingBridgeRequest(trackedRequest) {
+  if (!trackedRequest || typeof trackedRequest !== "object") {
+    return null;
+  }
+
+  const requestId = normalizeNonEmptyString(trackedRequest.requestId);
+  const method = normalizeNonEmptyString(trackedRequest.method);
+  if (!requestId || !method) {
+    return null;
+  }
+
+  const threadId = normalizeNonEmptyString(trackedRequest.threadId) || null;
+  const turnId = normalizeNonEmptyString(trackedRequest.turnId) || null;
+
+  if (isStructuredUserInputMethod(method)) {
+    const questionCount = countStructuredUserInputQuestions(trackedRequest.params);
+    return {
+      kind: "structured_user_input",
+      requestId,
+      threadId,
+      turnId,
+      questionCount,
+      pushEvent: {
+        eventType: "structured_user_input_needed",
+        threadId,
+        turnId,
+        title: "rimcodex input needed",
+        body: buildStructuredUserInputNotificationBody(questionCount),
+        dedupeKey: `structured-user-input:${requestId}`,
+        eventPayload: {
+          requestId,
+          questionCount: questionCount > 0 ? questionCount : undefined,
+        },
+      },
+    };
+  }
+
+  if (!isBridgeApprovalMethod(method)) {
+    return null;
+  }
+
+  const reason = readString(trackedRequest.params?.reason) || null;
+  return {
+    kind: "approval",
+    requestId,
+    threadId,
+    turnId,
+    reason,
+    pushEvent: {
+      eventType: "approval_needed",
+      threadId,
+      turnId,
+      title: "rimcodex approval needed",
+      body: reason || "Approval needed to continue the run.",
+      dedupeKey: `approval-needed:${requestId}`,
+      eventPayload: {
+        requestId,
+      },
+    },
+  };
+}
+
+function buildPendingBridgeRequestLifecycleEvent(requestAttention, phase) {
+  if (!requestAttention || typeof requestAttention !== "object") {
+    return null;
+  }
+
+  const metadata = {
+    threadId: requestAttention.threadId || null,
+    turnId: requestAttention.turnId || null,
+  };
+  if (requestAttention.kind === "structured_user_input" && requestAttention.questionCount > 0) {
+    metadata.questionCount = requestAttention.questionCount;
+  }
+
+  if (requestAttention.kind === "structured_user_input") {
+    switch (phase) {
+      case "requested":
+        return {
+          type: "structured_user_input.requested",
+          level: "warning",
+          message: "Codex needs input to continue.",
+          detail: buildStructuredUserInputNotificationBody(requestAttention.questionCount),
+          metadata,
+        };
+      case "resolved":
+        return {
+          type: "structured_user_input.resolved",
+          level: "info",
+          message: "Resolved a pending input request.",
+          metadata,
+        };
+      case "expired":
+        return {
+          type: "structured_user_input.expired",
+          level: "warning",
+          message: "Expired a stale input request.",
+          metadata,
+        };
+      default:
+        return null;
+    }
+  }
+
+  if (requestAttention.kind !== "approval") {
+    return null;
+  }
+
+  switch (phase) {
+    case "requested":
+      return {
+        type: "approval.requested",
+        level: "warning",
+        message: "A run is waiting for approval.",
+        detail: requestAttention.reason || null,
+        metadata,
+      };
+    case "resolved":
+      return {
+        type: "approval.resolved",
+        level: "info",
+        message: "Resolved a pending approval.",
+        metadata,
+      };
+    case "expired":
+      return {
+        type: "approval.expired",
+        level: "warning",
+        message: "Expired a stale pending approval.",
+        metadata,
+      };
+    default:
+      return null;
+  }
+}
+
+function buildPendingBridgeRequestResolvedDetail(requestAttention) {
+  switch (requestAttention?.kind) {
+    case "approval":
+      return "The approval completed with an error response.";
+    case "structured_user_input":
+      return "The input request completed with an error response.";
+    default:
+      return "The pending request completed with an error response.";
+  }
+}
+
+function countStructuredUserInputQuestions(params) {
+  return Array.isArray(params?.questions) ? params.questions.length : 0;
+}
+
+function buildStructuredUserInputNotificationBody(questionCount) {
+  if (questionCount === 1) {
+    return "Codex needs one answer to continue.";
+  }
+
+  if (questionCount > 1) {
+    return `Codex needs ${questionCount} answers to continue.`;
+  }
+
+  return "Codex needs input to continue.";
 }
 
 // Shrinks `thread/read` and `thread/resume` snapshots by eliding inline image blobs.
@@ -2042,7 +2199,10 @@ function buildHeartbeatBridgeStatus(
 }
 
 module.exports = {
+  buildPendingBridgeRequestLifecycleEvent,
+  buildStructuredUserInputNotificationBody,
   buildHeartbeatBridgeStatus,
+  describePendingBridgeRequest,
   hasRelayConnectionGoneStale,
   sanitizeThreadHistoryImagesForRelay,
   startBridge,
