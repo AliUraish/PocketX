@@ -18,6 +18,7 @@ function createPushSessionService({
   apnsClient = createAPNsClient(apnsConfigFromEnv(process.env)),
   canRegisterSession = () => true,
   canNotifyCompletion = null,
+  shouldDeliverPush = () => true,
   now = () => Date.now(),
   logPrefix = "[relay]",
   stateStore = createFileBackedPushStateStore({
@@ -127,6 +128,17 @@ function createPushSessionService({
       return { ok: true, skipped: true };
     }
 
+    if (!await shouldDeliverPush({
+      sessionId: normalizedSessionId,
+      notificationSecret: normalizedSecret,
+      threadId: normalizedThreadId,
+      turnId: readString(turnId) || "",
+      kind: "completion",
+      result: normalizedResult,
+    })) {
+      return { ok: true, skipped: true, reason: "iphone_connected" };
+    }
+
     await apnsClient.sendNotification({
       deviceToken: session.deviceToken,
       apnsEnvironment: session.apnsEnvironment,
@@ -195,13 +207,24 @@ function createPushSessionService({
       return { ok: true, skipped: true };
     }
 
+    if (!await shouldDeliverPush({
+      sessionId: normalizedSessionId,
+      notificationSecret: normalizedSecret,
+      threadId: normalizedThreadId || "",
+      turnId: readString(turnId) || "",
+      kind: "event",
+      eventType: normalizedEventType,
+    })) {
+      return { ok: true, skipped: true, reason: "iphone_connected" };
+    }
+
     await apnsClient.sendNotification({
       deviceToken: session.deviceToken,
       apnsEnvironment: session.apnsEnvironment,
       title: normalizePreviewText(title) || fallbackTitleForEventType(normalizedEventType),
-      body: normalizePreviewText(body) || fallbackBodyForEventType(normalizedEventType),
+      body: normalizePreviewText(body) || fallbackBodyForEventType(normalizedEventType, eventPayload),
       payload: {
-        source: "codex.bridgeEvent",
+        source: notificationSourceForEventType(normalizedEventType),
         eventType: normalizedEventType,
         threadId: normalizedThreadId || "",
         turnId: readString(turnId) || "",
@@ -392,6 +415,8 @@ function fallbackTitleForEventType(eventType) {
   switch (eventType) {
     case "approval_needed":
       return "rimcodex approval needed";
+    case "structured_user_input_needed":
+      return "rimcodex input needed";
     case "bridge_offline":
       return "rimcodex went offline";
     case "reconnect_succeeded":
@@ -403,10 +428,20 @@ function fallbackTitleForEventType(eventType) {
   }
 }
 
-function fallbackBodyForEventType(eventType) {
+function fallbackBodyForEventType(eventType, eventPayload) {
   switch (eventType) {
     case "approval_needed":
       return "Approval needed to continue the run.";
+    case "structured_user_input_needed": {
+      const questionCount = readPositiveInteger(eventPayload?.questionCount);
+      if (questionCount === 1) {
+        return "Codex needs one answer to continue.";
+      }
+      if (questionCount > 1) {
+        return `Codex needs ${questionCount} answers to continue.`;
+      }
+      return "Codex needs input to continue.";
+    }
     case "bridge_offline":
       return "The Mac bridge is no longer reachable.";
     case "reconnect_succeeded":
@@ -431,6 +466,12 @@ function safeNotificationPayloadObject(value) {
       return typeof entryValue === "number" || typeof entryValue === "boolean";
     })
   );
+}
+
+function notificationSourceForEventType(eventType) {
+  return eventType === "structured_user_input_needed"
+    ? "codex.structuredUserInput"
+    : "codex.bridgeEvent";
 }
 
 function resolvePushStateFilePath(env = process.env) {
@@ -485,6 +526,11 @@ function secretsEqual(left, right) {
 
 function readString(value) {
   return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function readPositiveInteger(value) {
+  const normalized = Number(value);
+  return Number.isInteger(normalized) && normalized > 0 ? normalized : 0;
 }
 
 function pushServiceError(code, message, status) {
