@@ -1,23 +1,24 @@
 {
-  "name": "rimcodex",
+  "name": "pocketex",
   "version": "1.3.7",
-  "description": "Local bridge between Codex and the rimcodex mobile app. Run `rimcodex up` to start.",
+  "description": "Local bridge between Codex and the pocketex mobile app. Run `pocketex up` to start.",
   "main": "src/index.js",
   "bin": {
-    "rimcodex": "./bin/rimcodex.js"
+    "pocketex": "./bin/pocketex.js",
+    "phodex": "./bin/phodex.js"
   },
   "files": [
     "bin/",
     "src/"
   ],
   "scripts": {
-    "start": "node ./bin/rimcodex.js up",
+    "start": "node ./bin/pocketex.js up",
     "test": "node --test ./test/*.test.js",
     "prepack": "node ./scripts/prepare-private-defaults.js",
     "postpack": "node ./scripts/cleanup-private-defaults.js"
   },
   "keywords": [
-    "rimcodex",
+    "pocketex",
     "codex",
     "bridge",
     "cli"
