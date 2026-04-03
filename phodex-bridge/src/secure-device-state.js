@@ -10,9 +10,9 @@ const path = require("path");
 const { randomUUID, generateKeyPairSync } = require("crypto");
 const { execFileSync } = require("child_process");
 
-const DEFAULT_STORE_DIR = path.join(os.homedir(), ".rimcodex");
+const DEFAULT_STORE_DIR = path.join(os.homedir(), ".pocketex");
 const DEFAULT_STORE_FILE = path.join(DEFAULT_STORE_DIR, "device-state.json");
-const KEYCHAIN_SERVICE = "com.rimcodex.bridge.device-state";
+const KEYCHAIN_SERVICE = "com.pocketex.bridge.device-state";
 const KEYCHAIN_ACCOUNT = "default";
 let hasLoggedKeychainMismatch = false;
 
@@ -29,7 +29,7 @@ function loadOrCreateBridgeDeviceState() {
   if (fileRecord.error) {
     if (keychainRecord.state) {
       warnOnce(
-        "[rimcodex] Recovering the canonical device-state.json from the legacy Keychain pairing mirror."
+        "[pocketex] Recovering the canonical device-state.json from the Keychain pairing mirror."
       );
       writeBridgeDeviceState(keychainRecord.state);
       return keychainRecord.state;
@@ -38,7 +38,7 @@ function loadOrCreateBridgeDeviceState() {
   }
 
   if (keychainRecord.error) {
-    throw corruptedStateError("legacy Keychain bridge state", keychainRecord.error);
+    throw corruptedStateError("Keychain bridge state", keychainRecord.error);
   }
 
   if (keychainRecord.state) {
@@ -51,7 +51,7 @@ function loadOrCreateBridgeDeviceState() {
   return nextState;
 }
 
-// Removes the saved bridge identity/trust state so the next `rimcodex up` requires a fresh pairing.
+// Removes the saved bridge identity/trust state so the next `pocketex up` requires a fresh pairing.
 function resetBridgeDeviceState() {
   const removedCanonicalFile = deleteCanonicalFileState();
   const removedKeychainMirror = deleteKeychainStateString();
@@ -79,7 +79,7 @@ function rememberTrustedPhone(state, phoneDeviceId, phoneIdentityPublicKey, { pe
     return state;
   }
 
-  // rimcodex supports one trusted iPhone per Mac, so a new trust record replaces old ones.
+  // pocketex supports one trusted iPhone per Mac, so a new trust record replaces old ones.
   const nextState = normalizeBridgeDeviceState({
     ...state,
     trustedPhones: {
@@ -135,7 +135,7 @@ function readCanonicalFileStateRecord() {
   }
 }
 
-// Reads the legacy Keychain mirror so old installs can be migrated into the canonical file.
+// Reads the Keychain mirror so the canonical file can be restored if needed.
 function readKeychainStateRecord() {
   const rawState = readKeychainStateString();
   if (!rawState) {
@@ -171,21 +171,22 @@ function writeCanonicalFileStateString(serialized) {
   }
 }
 
+function resolveDefaultStoreDir() {
+  return DEFAULT_STORE_DIR;
+}
+
 function resolveStoreDir() {
-  return normalizeNonEmptyString(process.env.RIMCODEX_DEVICE_STATE_DIR)
-    || normalizeNonEmptyString(process.env.REMODEX_DEVICE_STATE_DIR)
-    || DEFAULT_STORE_DIR;
+  return normalizeNonEmptyString(process.env.POCKETEX_DEVICE_STATE_DIR)
+    || resolveDefaultStoreDir();
 }
 
 function resolveStoreFile() {
-  return normalizeNonEmptyString(process.env.RIMCODEX_DEVICE_STATE_FILE)
-    || normalizeNonEmptyString(process.env.REMODEX_DEVICE_STATE_FILE)
+  return normalizeNonEmptyString(process.env.POCKETEX_DEVICE_STATE_FILE)
     || path.join(resolveStoreDir(), "device-state.json");
 }
 
 function resolveKeychainMirrorFile() {
-  return normalizeNonEmptyString(process.env.RIMCODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE)
-    || normalizeNonEmptyString(process.env.REMODEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE);
+  return normalizeNonEmptyString(process.env.POCKETEX_DEVICE_STATE_KEYCHAIN_MOCK_FILE);
 }
 
 function readKeychainStateString() {
@@ -202,13 +203,17 @@ function readKeychainStateString() {
     return null;
   }
 
+  return readKeychainStateStringForService(KEYCHAIN_SERVICE);
+}
+
+function readKeychainStateStringForService(serviceName) {
   try {
     return execFileSync(
       "security",
       [
         "find-generic-password",
         "-s",
-        KEYCHAIN_SERVICE,
+        serviceName,
         "-a",
         KEYCHAIN_ACCOUNT,
         "-w",
@@ -273,13 +278,19 @@ function deleteKeychainStateString() {
     return false;
   }
 
+  const removedPrimary = deleteKeychainStateStringForService(KEYCHAIN_SERVICE);
+  const removedLegacy = deleteKeychainStateStringForService(LEGACY_KEYCHAIN_SERVICE);
+  return removedPrimary || removedLegacy;
+}
+
+function deleteKeychainStateStringForService(serviceName) {
   try {
     execFileSync(
       "security",
       [
         "delete-generic-password",
         "-s",
-        KEYCHAIN_SERVICE,
+        serviceName,
         "-a",
         KEYCHAIN_ACCOUNT,
       ],
@@ -305,7 +316,7 @@ function deleteCanonicalFileState() {
 // Prefers the canonical file, but repairs or warns about stale legacy Keychain mirrors.
 function reconcileLegacyKeychainMirror(canonicalState, keychainRecord) {
   if (keychainRecord.error) {
-    warnOnce("[rimcodex] Ignoring unreadable legacy Keychain pairing mirror; using canonical device-state.json.");
+    warnOnce("[pocketex] Ignoring unreadable legacy Keychain pairing mirror; using canonical device-state.json.");
     return;
   }
 
@@ -318,7 +329,7 @@ function reconcileLegacyKeychainMirror(canonicalState, keychainRecord) {
     return;
   }
 
-  warnOnce("[rimcodex] Canonical bridge pairing state differs from the legacy Keychain mirror; using device-state.json.");
+  warnOnce("[pocketex] Canonical bridge pairing state differs from the legacy Keychain mirror; using device-state.json.");
   writeKeychainStateString(JSON.stringify(canonicalState, null, 2));
 }
 
@@ -366,8 +377,8 @@ function normalizeNonEmptyString(value) {
 function corruptedStateError(source, error) {
   const detail = normalizeNonEmptyString(error?.message);
   return new Error(
-    `The saved rimcodex pairing state in ${source} is unreadable. `
-      + "Run `rimcodex reset-pairing` to start fresh."
+    `The saved pocketex pairing state in ${source} is unreadable. `
+      + "Run `pocketex reset-pairing` to start fresh."
       + (detail ? ` (${detail})` : "")
   );
 }
