@@ -68,7 +68,7 @@ struct OnboardingCommandCard: View {
 #Preview("Short") {
     ZStack {
         Color.black.ignoresSafeArea()
-        OnboardingCommandCard(command: "rimcodex up")
+        OnboardingCommandCard(command: "pocketex up")
             .padding()
     }
     .preferredColorScheme(.dark)
