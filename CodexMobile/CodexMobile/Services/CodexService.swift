@@ -53,6 +53,12 @@ struct CodexSubagentIdentityEntry: Equatable, Sendable {
     }
 }
 
+struct BufferedAssistantDeltaState: Sendable {
+    let messageId: String
+    var pendingDelta: String
+    var latestItemId: String?
+}
+
 struct CodexSecureControlWaiter {
     let id: UUID
     let continuation: CheckedContinuation<String, Error>
@@ -430,6 +436,9 @@ final class CodexService {
     var commandExecutionDetailsByItemID: [String: CommandExecutionDetails] = [:]
     // Debounces disk writes while streaming to keep UI responsive.
     var messagePersistenceDebounceTask: Task<Void, Never>?
+    // Coalesces token deltas to display-frame cadence so assistant output streams smoothly.
+    @ObservationIgnored var bufferedAssistantDeltaByThread: [String: BufferedAssistantDeltaState] = [:]
+    @ObservationIgnored var assistantDeltaFlushTaskByThread: [String: Task<Void, Never>] = [:]
     // Coalesces multiple invalidateAssistantRevertStates() calls within the same run loop tick into one refresh.
     var coalescedRevertRefreshTask: Task<Void, Never>?
     // Dedupes completion payloads when servers omit turn/item identifiers.
