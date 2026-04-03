@@ -17,8 +17,8 @@ enum LocalNetworkAuthorizationStatus: Equatable {
 
 @MainActor
 final class LocalNetworkAuthorizationRequester: NSObject, NetServiceDelegate {
-    private let serviceType = "_rimcodex-permission._tcp"
-    private let serviceName = "rimcodexLocalNetwork"
+    private let serviceType = "_pocketex-permission._tcp"
+    private let serviceName = "pocketexLocalNetwork"
 
     private var browser: NWBrowser?
     private var netService: NetService?
