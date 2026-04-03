@@ -27,7 +27,7 @@ class CodexDesktopRefresher {
     refreshCommand = "",
     bundleId = DEFAULT_BUNDLE_ID,
     appPath = DEFAULT_APP_PATH,
-    logPrefix = "[rimcodex]",
+    logPrefix = "[pocketex]",
     fallbackNewThreadMs = DEFAULT_FALLBACK_NEW_THREAD_MS,
     midRunRefreshThrottleMs = DEFAULT_MID_RUN_REFRESH_THROTTLE_MS,
     rolloutLookupTimeoutMs = DEFAULT_ROLLOUT_LOOKUP_TIMEOUT_MS,
@@ -369,7 +369,7 @@ class CodexDesktopRefresher {
     this.fallbackTimer = null;
   }
 
-  // Keeps one lightweight rollout watcher alive for the current rimcodex-controlled thread.
+  // Keeps one lightweight rollout watcher alive for the current pocketex-controlled thread.
   ensureWatcher(threadId) {
     if (!this.canRefresh() || !threadId) {
       return;
@@ -528,12 +528,12 @@ function readBridgeConfig({
     ? ""
     : privateDefaults.relayUrl;
   const explicitRelayUrl = readFirstDefinedEnv(
-    ["RIMCODEX_RELAY", "REMODEX_RELAY", "PHODEX_RELAY"],
+    ["POCKETEX_RELAY", "PHODEX_RELAY"],
     "",
     env
   );
   const relayUrl = readFirstDefinedEnv(
-    ["RIMCODEX_RELAY", "REMODEX_RELAY", "PHODEX_RELAY"],
+    ["POCKETEX_RELAY", "PHODEX_RELAY"],
     defaultRelayUrl,
     env
   );
@@ -541,17 +541,17 @@ function readBridgeConfig({
     ? ""
     : privateDefaults.pushServiceUrl;
   const codexEndpoint = readFirstDefinedEnv(
-    ["RIMCODEX_CODEX_ENDPOINT", "REMODEX_CODEX_ENDPOINT", "PHODEX_CODEX_ENDPOINT"],
+    ["POCKETEX_CODEX_ENDPOINT", "PHODEX_CODEX_ENDPOINT"],
     "",
     env
   );
   const refreshCommand = readFirstDefinedEnv(
-    ["RIMCODEX_REFRESH_COMMAND", "REMODEX_REFRESH_COMMAND", "PHODEX_ON_PHONE_MESSAGE"],
+    ["POCKETEX_REFRESH_COMMAND", "PHODEX_ON_PHONE_MESSAGE"],
     "",
     env
   );
   const explicitRefreshEnabled = readOptionalBooleanEnv(
-    ["RIMCODEX_REFRESH_ENABLED", "REMODEX_REFRESH_ENABLED"],
+    ["POCKETEX_REFRESH_ENABLED"],
     env
   );
   // Desktop refresh is opt-in for now because Codex.app still lacks true live updates.
@@ -559,13 +559,13 @@ function readBridgeConfig({
   return {
     relayUrl,
     pushServiceUrl: readFirstDefinedEnv(
-      ["RIMCODEX_PUSH_SERVICE_URL", "REMODEX_PUSH_SERVICE_URL"],
+      ["POCKETEX_PUSH_SERVICE_URL"],
       defaultPushServiceUrl,
       env
     ),
     pushPreviewMaxChars: parseIntegerEnv(
       readFirstDefinedEnv(
-        ["RIMCODEX_PUSH_PREVIEW_MAX_CHARS", "REMODEX_PUSH_PREVIEW_MAX_CHARS"],
+        ["POCKETEX_PUSH_PREVIEW_MAX_CHARS"],
         "160",
         env
       ),
@@ -576,7 +576,7 @@ function readBridgeConfig({
       : explicitRefreshEnabled,
     refreshDebounceMs: parseIntegerEnv(
       readFirstDefinedEnv(
-        ["RIMCODEX_REFRESH_DEBOUNCE_MS", "REMODEX_REFRESH_DEBOUNCE_MS"],
+        ["POCKETEX_REFRESH_DEBOUNCE_MS"],
         String(DEFAULT_DEBOUNCE_MS),
         env
       ),
@@ -585,7 +585,7 @@ function readBridgeConfig({
     codexEndpoint,
     refreshCommand,
     codexBundleId: readFirstDefinedEnv(
-      ["RIMCODEX_CODEX_BUNDLE_ID", "REMODEX_CODEX_BUNDLE_ID"],
+      ["POCKETEX_CODEX_BUNDLE_ID"],
       DEFAULT_BUNDLE_ID,
       env
     ),
