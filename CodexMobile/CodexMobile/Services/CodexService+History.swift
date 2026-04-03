@@ -1011,7 +1011,7 @@ nonisolated static func mergeHistoryMessages(
     nonisolated static func isElidedHistoryImageAttachment(_ attachment: CodexImageAttachment) -> Bool {
         attachment.payloadDataURL == nil
             && attachment.thumbnailBase64JPEG.isEmpty
-            && attachment.sourceURL == "rimcodex://history-image-elided"
+            && attachment.sourceURL == "pocketex://history-image-elided"
     }
 
     func normalizedItemType(_ rawType: String) -> String {
