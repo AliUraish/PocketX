@@ -50,6 +50,7 @@ struct SidebarView: View {
                 action: handleNewChatButtonTap
             )
             .padding(.horizontal, DesignTokens.Spacing.lg)
+            .padding(.top, 10)
             .padding(.bottom, 10)
 
             SidebarThreadListView(
