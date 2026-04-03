@@ -42,8 +42,12 @@ struct SidebarSearchField: View {
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                Color(.tertiarySystemFill).opacity(0.8),
+                DesignTokens.Colors.inputBackground,
                 in: RoundedRectangle(cornerRadius: selectedRowCornerRadius, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: selectedRowCornerRadius, style: .continuous)
+                    .stroke(DesignTokens.Colors.cardBorder, lineWidth: 1)
             )
 
             if isFocused {
