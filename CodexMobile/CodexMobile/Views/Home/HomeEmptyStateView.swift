@@ -102,7 +102,7 @@ struct HomeEmptyStateView<AuthSection: View>: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationTitle("rimcodex")
+        .navigationTitle("pocketex")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if connectionPhase == .connecting {
