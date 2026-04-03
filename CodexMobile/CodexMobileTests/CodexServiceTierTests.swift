@@ -83,12 +83,12 @@ final class CodexServiceTierTests: XCTestCase {
         XCTAssertNil(capturedTurnStartParams[1].objectValue?["serviceTier"]?.stringValue)
         XCTAssertNil(capturedTurnStartParams[2].objectValue?["serviceTier"]?.stringValue)
         XCTAssertFalse(service.supportsServiceTier)
-        XCTAssertEqual(service.bridgeUpdatePrompt?.title, "Update Remodex on your Mac to use Speed controls")
+        XCTAssertEqual(service.bridgeUpdatePrompt?.title, "Update Pocketex on your Mac to use Speed controls")
         XCTAssertEqual(
             service.bridgeUpdatePrompt?.message,
-            "This Mac bridge does not support the selected speed setting yet. Update the Remodex npm package to use Fast Mode and other speed controls."
+            "This Mac bridge does not support the selected speed setting yet. Update the Pocketex npm package to use Fast Mode and other speed controls."
         )
-        XCTAssertEqual(service.bridgeUpdatePrompt?.command, "npm install -g remodex@1.1.4")
+        XCTAssertEqual(service.bridgeUpdatePrompt?.command, "npm install -g pocketex@1.1.4")
     }
 
     private func makeService() -> CodexService {
