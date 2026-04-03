@@ -10,7 +10,14 @@ const assert = require("node:assert/strict");
 const { createPushNotificationTracker } = require("../src/push-notification-tracker");
 const { createNotificationsHandler } = require("../src/notifications-handler");
 
-test("push tracker sends one completion push with a stable ready body", async () => {
+function markPhoneOriginatedRun(tracker, threadId, turnId = null) {
+  tracker.markPhoneOriginatedRun({
+    threadId,
+    turnId,
+  });
+}
+
+test("push tracker sends one completion push with the latest assistant preview", async () => {
   const notifications = [];
   const tracker = createPushNotificationTracker({
     sessionId: "session-1",
@@ -24,6 +31,13 @@ test("push tracker sends one completion push with a stable ready body", async ()
     previewMaxChars: 80,
   });
 
+  tracker.handleInbound(JSON.stringify({
+    id: "turn-start-1",
+    method: "turn/start",
+    params: {
+      threadId: "thread-1",
+    },
+  }));
   tracker.handleOutbound(JSON.stringify({
     method: "thread/started",
     params: {
@@ -82,7 +96,7 @@ test("push tracker sends one completion push with a stable ready body", async ()
   assert.equal(notifications[0].turnId, "turn-1");
   assert.equal(notifications[0].result, "completed");
   assert.equal(notifications[0].title, "Fix auth bug");
-  assert.equal(notifications[0].body, "Response ready");
+  assert.equal(notifications[0].body, "The login fix is ready to review.");
 });
 
 test("push tracker ignores non-assistant item completions when a turn finishes", async () => {
@@ -98,6 +112,7 @@ test("push tracker ignores non-assistant item completions when a turn finishes",
     },
   });
 
+  markPhoneOriginatedRun(tracker, "thread-tools", "turn-tools");
   tracker.handleOutbound(JSON.stringify({
     method: "turn/started",
     params: {
@@ -144,6 +159,7 @@ test("push tracker uses failure previews for failed turns", async () => {
     },
   });
 
+  markPhoneOriginatedRun(tracker, "thread-2", "turn-2");
   tracker.handleOutbound(JSON.stringify({
     method: "turn/started",
     params: {
@@ -190,6 +206,7 @@ test("push tracker sends a failed push for terminal error events", async () => {
     },
   });
 
+  markPhoneOriginatedRun(tracker, "thread-error", "turn-error");
   tracker.handleOutbound(JSON.stringify({
     method: "turn/started",
     params: {
@@ -228,6 +245,7 @@ test("push tracker dedupes turnless terminal thread statuses per time bucket", a
     now: () => currentTime,
   });
 
+  markPhoneOriginatedRun(tracker, "thread-status");
   tracker.handleOutbound(JSON.stringify({
     method: "thread/started",
     params: {
@@ -255,6 +273,7 @@ test("push tracker dedupes turnless terminal thread statuses per time bucket", a
   await new Promise((resolve) => setTimeout(resolve, 10));
 
   currentTime = 31_000;
+  markPhoneOriginatedRun(tracker, "thread-status");
   tracker.handleOutbound(JSON.stringify({
     method: "thread/status/changed",
     params: {
@@ -287,6 +306,7 @@ test("push tracker ignores thread-status fallback after a turn completion alread
     now: () => currentTime,
   });
 
+  markPhoneOriginatedRun(tracker, "thread-mixed-runtime", "turn-mixed-runtime");
   tracker.handleOutbound(JSON.stringify({
     method: "turn/completed",
     params: {
@@ -326,6 +346,7 @@ test("push tracker clears fallback suppression when a new turn starts", async ()
     now: () => currentTime,
   });
 
+  markPhoneOriginatedRun(tracker, "thread-queued-runtime", "turn-a");
   tracker.handleOutbound(JSON.stringify({
     method: "turn/completed",
     params: {
@@ -342,6 +363,7 @@ test("push tracker clears fallback suppression when a new turn starts", async ()
       turnId: "turn-b",
     },
   }));
+  markPhoneOriginatedRun(tracker, "thread-queued-runtime");
 
   currentTime = 2_000;
   tracker.handleOutbound(JSON.stringify({
@@ -375,6 +397,7 @@ test("push tracker expires old sent dedupe keys", async () => {
     now: () => currentTime,
   });
 
+  markPhoneOriginatedRun(tracker, "thread-expiry", "turn-expiry");
   tracker.handleOutbound(JSON.stringify({
     method: "turn/completed",
     params: {
@@ -387,6 +410,7 @@ test("push tracker expires old sent dedupe keys", async () => {
   assert.equal(notifications.length, 1);
 
   currentTime = 24 * 60 * 60 * 1000 + 1;
+  markPhoneOriginatedRun(tracker, "thread-expiry", "turn-expiry");
   tracker.handleOutbound(JSON.stringify({
     method: "turn/completed",
     params: {
@@ -397,6 +421,85 @@ test("push tracker expires old sent dedupe keys", async () => {
 
   await new Promise((resolve) => setTimeout(resolve, 10));
   assert.equal(notifications.length, 2);
+});
+
+test("push tracker ignores completions for runs that did not start on the phone", async () => {
+  const notifications = [];
+  const tracker = createPushNotificationTracker({
+    sessionId: "session-desktop-only",
+    pushServiceClient: {
+      hasConfiguredBaseUrl: true,
+      async notifyCompletion(payload) {
+        notifications.push(payload);
+        return { ok: true };
+      },
+    },
+  });
+
+  tracker.handleOutbound(JSON.stringify({
+    method: "turn/started",
+    params: {
+      threadId: "thread-desktop-only",
+      turnId: "turn-desktop-only",
+    },
+  }));
+  tracker.handleOutbound(JSON.stringify({
+    method: "turn/completed",
+    params: {
+      threadId: "thread-desktop-only",
+      turnId: "turn-desktop-only",
+    },
+  }));
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.equal(notifications.length, 0);
+});
+
+test("push tracker clears phone-origin eligibility when turn/start fails", async () => {
+  const notifications = [];
+  const tracker = createPushNotificationTracker({
+    sessionId: "session-failed-start",
+    pushServiceClient: {
+      hasConfiguredBaseUrl: true,
+      async notifyCompletion(payload) {
+        notifications.push(payload);
+        return { ok: true };
+      },
+    },
+  });
+
+  tracker.handleInbound(JSON.stringify({
+    id: "turn-start-failed",
+    method: "turn/start",
+    params: {
+      threadId: "thread-failed-start",
+    },
+  }));
+  tracker.handleOutbound(JSON.stringify({
+    id: "turn-start-failed",
+    error: {
+      message: "turn/start failed",
+    },
+  }));
+  tracker.handleOutbound(JSON.stringify({
+    method: "turn/started",
+    params: {
+      threadId: "thread-failed-start",
+      turnId: "turn-failed-start",
+    },
+  }));
+  tracker.handleOutbound(JSON.stringify({
+    method: "turn/completed",
+    params: {
+      threadId: "thread-failed-start",
+      turnId: "turn-failed-start",
+    },
+  }));
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.equal(notifications.length, 0);
 });
 
 test("notifications handler forwards device registration to the push service client", async () => {
