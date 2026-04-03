@@ -21,12 +21,18 @@ private struct AdaptiveGlassModifier<S: Shape>: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26, *), glassEnabled {
             if regularStyle {
-                content.glassEffect(.regular, in: shape)
+                content
+                    .background(DesignTokens.Colors.glassAccent.opacity(0.15), in: shape)
+                    .glassEffect(.regular, in: shape)
             } else {
-                content.glassEffect(in: shape)
+                content
+                    .background(DesignTokens.Colors.glassAccent.opacity(0.15), in: shape)
+                    .glassEffect(in: shape)
             }
         } else {
-            content.background(.thinMaterial, in: shape)
+            content
+                .background(DesignTokens.Colors.glassAccent.opacity(0.18), in: shape)
+                .background(.thinMaterial, in: shape)
         }
     }
 }
