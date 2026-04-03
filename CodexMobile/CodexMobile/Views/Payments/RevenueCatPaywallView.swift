@@ -151,7 +151,7 @@ struct RevenueCatPaywallView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 
 
-            Text("Unlock rimcodex Pro")
+            Text("Unlock pocketex Pro")
                 .font(AppFont.system(size: 24, weight: .bold))
 
             Text("Everything runs on your Mac. Your phone is the remote.")
@@ -216,7 +216,7 @@ struct RevenueCatPaywallView: View {
                                 .tint(colorScheme == .dark ? .black : .white)
                         } else {
                        
-                            Text("Unlock rimcodex Pro")
+                            Text("Unlock pocketex Pro")
                                 .font(AppFont.body(weight: .semibold))
                         }
                     }
