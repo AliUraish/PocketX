@@ -1,5 +1,5 @@
 // FILE: SubscriptionGateView.swift
-// Purpose: Locked shell shown before app access when rimcodex Pro is required.
+// Purpose: Locked shell shown before app access when pocketex Pro is required.
 // Layer: View
 // Exports: SubscriptionGateView
 // Depends on: SwiftUI, SubscriptionService, RevenueCatPaywallView
@@ -21,7 +21,7 @@ private let subscriptionGateFeatures: [SubscriptionGateFeature] = [
     .init(id: 4, icon: "point.3.connected.trianglepath.dotted", title: "Subagents", subtitle: "Delegate complex tasks to specialized sub-agents"),
     .init(id: 5, icon: "at", title: "$skills /cmds @files", subtitle: "Invoke skills, run slash commands, and mention files inline"),
     .init(id: 6, icon: "server.rack", title: "Hosted relay", subtitle: "You are paying for the product and the hosted path"),
-    .init(id: 7, icon: "heart", title: "Support development", subtitle: "Help keep rimcodex independent and open source"),
+    .init(id: 7, icon: "heart", title: "Support development", subtitle: "Help keep pocketex independent and open source"),
 ]
 
 struct SubscriptionGatePreviewPlan: Identifiable {
@@ -89,12 +89,12 @@ struct SubscriptionGateView: View {
                 )
 
             VStack(spacing: 10) {
-                Text("rimcodex Pro Required")
+                Text("pocketex Pro Required")
                     .font(AppFont.system(size: 24, weight: .bold))
                     .foregroundStyle(primaryTextColor)
                     .multilineTextAlignment(.center)
 
-                Text("rimcodex is subscription-only. Unlock the app to connect your iPhone to Codex running on your Mac.")
+                Text("pocketex is subscription-only. Unlock the app to connect your iPhone to Codex running on your Mac.")
                     .font(AppFont.caption())
                     .foregroundStyle(secondaryTextColor)
                     .multilineTextAlignment(.center)
@@ -270,7 +270,7 @@ struct SubscriptionGateView: View {
     private var pricingPlaceholderRow: some View {
         HStack {
             VStack(alignment: .leading, spacing: 6) {
-                Text("rimcodex Pro")
+                Text("pocketex Pro")
                     .font(AppFont.subheadline(weight: .semibold))
                 Text("$0.00 / month")
                     .font(AppFont.caption())
@@ -470,7 +470,7 @@ struct SubscriptionBootstrapFailureView: View {
                             .foregroundStyle(primaryTextColor)
                             .multilineTextAlignment(.center)
 
-                        Text("rimcodex couldn’t confirm your Pro access yet. Check your connection, retry, or restore your App Store purchases.")
+                        Text("pocketex couldn’t confirm your Pro access yet. Check your connection, retry, or restore your App Store purchases.")
                             .font(AppFont.caption())
                             .foregroundStyle(secondaryTextColor)
                             .multilineTextAlignment(.center)
@@ -577,7 +577,7 @@ private struct SubscriptionMacLoginInfoSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    Text("rimcodex connects to Codex running on your Mac. Buying Pro unlocks the app, but you still need Codex already logged in on the Mac side.")
+                    Text("pocketex connects to Codex running on your Mac. Buying Pro unlocks the app, but you still need Codex already logged in on the Mac side.")
                         .font(AppFont.body())
 
                     infoStep(
@@ -594,7 +594,7 @@ private struct SubscriptionMacLoginInfoSheet: View {
 
                     infoStep(
                         number: 3,
-                        title: "Run rimcodex up",
+                        title: "Run pocketex up",
                         body: "The bridge prints a pairing code. Enter that code from the iPhone app after you have Pro access."
                     )
                 }
