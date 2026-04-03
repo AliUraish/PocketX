@@ -20,17 +20,56 @@ function createPushNotificationTracker({
   const threadTitleById = new Map();
   const threadIdByTurnId = new Map();
   const turnStateByKey = new Map();
+  const phoneOriginatedRunStateByThread = new Map();
+  const pendingPhoneOriginRequestsById = new Map();
   const completionDedupe = createPushNotificationCompletionDedupe({ now });
 
   // ─── ENTRY POINT ─────────────────────────────────────────────
 
+  function handleInbound(rawMessage) {
+    const parsed = safeParseJSON(rawMessage);
+    if (!parsed || typeof parsed.method !== "string") {
+      return;
+    }
+
+    const method = parsed.method.trim();
+    if (!isPhoneOriginatingRunMethod(method)) {
+      return;
+    }
+
+    const params = objectValue(parsed.params) || {};
+    const threadId = resolvePhoneOriginatingRunThreadId(method, params);
+    if (!threadId) {
+      return;
+    }
+
+    const turnId = resolvePhoneOriginatingRunTurnId(method, params);
+    rememberPhoneOriginatedRun(threadId, turnId);
+
+    const requestId = normalizeRequestId(parsed.id);
+    if (requestId) {
+      pendingPhoneOriginRequestsById.set(requestId, {
+        threadId,
+        turnId,
+      });
+    }
+  }
+
   function handleOutbound(rawMessage) {
-    const message = parseOutboundMessage(rawMessage);
+    const parsed = safeParseJSON(rawMessage);
+    if (!parsed) {
+      return;
+    }
+
+    handlePhoneOriginatingRunResponse(parsed);
+
+    const message = parseParsedOutboundMessage(parsed);
     if (!message) {
       return;
     }
 
     rememberMessageContext(message);
+    bindPhoneOriginatedRunTurnId(message.threadId, message.turnId, message.method);
     clearFallbackSuppressionForNewRun(message);
 
     if (isAssistantDeltaMethod(message.method)) {
@@ -107,6 +146,12 @@ function createPushNotificationTracker({
 
     const result = forcedResult || resolveCompletionResult(params, eventObject);
     if (!result) {
+      clearPhoneOriginatedRun(resolvedThreadId, turnId);
+      cleanupTurnState(resolvedThreadId, turnId);
+      return;
+    }
+
+    if (!matchesPhoneOriginatedRun(resolvedThreadId, turnId)) {
       cleanupTurnState(resolvedThreadId, turnId);
       return;
     }
@@ -163,6 +208,7 @@ function createPushNotificationTracker({
         turnId,
         result,
       });
+      clearPhoneOriginatedRun(resolvedThreadId, turnId);
     } catch (error) {
       completionDedupe.abortNotification({
         dedupeKey,
@@ -253,14 +299,108 @@ function createPushNotificationTracker({
     turnStateByKey.delete(turnStateKey(threadId, resolvedTurnId));
   }
 
+  function handlePhoneOriginatingRunResponse(parsed) {
+    const requestId = normalizeRequestId(parsed?.id);
+    if (!requestId || typeof parsed?.method === "string") {
+      return;
+    }
+
+    const request = pendingPhoneOriginRequestsById.get(requestId);
+    if (!request) {
+      return;
+    }
+
+    pendingPhoneOriginRequestsById.delete(requestId);
+
+    if (parsed?.error) {
+      clearPhoneOriginatedRun(request.threadId, request.turnId);
+      return;
+    }
+
+    const resolvedTurnId = extractResponseTurnId(parsed?.result) || request.turnId;
+    rememberPhoneOriginatedRun(request.threadId, resolvedTurnId);
+  }
+
+  function rememberPhoneOriginatedRun(threadId, turnId = null) {
+    const normalizedThreadId = readString(threadId);
+    if (!normalizedThreadId) {
+      return;
+    }
+
+    const state = phoneOriginatedRunStateByThread.get(normalizedThreadId) || {
+      turnId: null,
+    };
+    const normalizedTurnId = readString(turnId);
+    if (normalizedTurnId) {
+      state.turnId = normalizedTurnId;
+    }
+    phoneOriginatedRunStateByThread.set(normalizedThreadId, state);
+  }
+
+  function bindPhoneOriginatedRunTurnId(threadId, turnId, method) {
+    if (method !== "turn/started") {
+      return;
+    }
+
+    const normalizedThreadId = readString(threadId);
+    if (!normalizedThreadId || !phoneOriginatedRunStateByThread.has(normalizedThreadId)) {
+      return;
+    }
+
+    rememberPhoneOriginatedRun(threadId, turnId);
+  }
+
+  function matchesPhoneOriginatedRun(threadId, turnId) {
+    const normalizedThreadId = readString(threadId);
+    if (!normalizedThreadId) {
+      return false;
+    }
+
+    const state = phoneOriginatedRunStateByThread.get(normalizedThreadId);
+    if (!state) {
+      return false;
+    }
+
+    const normalizedTurnId = readString(turnId);
+    const trackedTurnId = readString(state.turnId);
+    return !trackedTurnId || !normalizedTurnId || trackedTurnId === normalizedTurnId;
+  }
+
+  function clearPhoneOriginatedRun(threadId, turnId = null) {
+    const normalizedThreadId = readString(threadId);
+    if (!normalizedThreadId) {
+      return;
+    }
+
+    const state = phoneOriginatedRunStateByThread.get(normalizedThreadId);
+    if (!state) {
+      return;
+    }
+
+    const normalizedTurnId = readString(turnId);
+    const trackedTurnId = readString(state.turnId);
+    if (trackedTurnId && normalizedTurnId && trackedTurnId !== normalizedTurnId) {
+      return;
+    }
+
+    phoneOriginatedRunStateByThread.delete(normalizedThreadId);
+  }
+
   return {
+    handleInbound,
     handleOutbound,
+    markPhoneOriginatedRun({ threadId, turnId } = {}) {
+      rememberPhoneOriginatedRun(threadId, turnId);
+    },
   };
 }
 
 // Normalizes the message envelope once so downstream helpers can share the same parsed view.
 function parseOutboundMessage(rawMessage) {
-  const parsed = safeParseJSON(rawMessage);
+  return parseParsedOutboundMessage(safeParseJSON(rawMessage));
+}
+
+function parseParsedOutboundMessage(parsed) {
   if (!parsed || typeof parsed.method !== "string") {
     return null;
   }
@@ -276,6 +416,53 @@ function parseOutboundMessage(rawMessage) {
     threadId: resolveThreadId(method, params, eventObject),
     turnId: resolveTurnId(method, params, eventObject),
   };
+}
+
+function isPhoneOriginatingRunMethod(method) {
+  return method === "turn/start"
+    || method === "turn/steer"
+    || method === "review/start";
+}
+
+function resolvePhoneOriginatingRunThreadId(method, params) {
+  const threadId = resolveThreadId(method, params, null);
+  return threadId || null;
+}
+
+function resolvePhoneOriginatingRunTurnId(method, params) {
+  if (method !== "turn/steer") {
+    return null;
+  }
+
+  return readString(
+    params?.expectedTurnId
+      || params?.expected_turn_id
+      || params?.turnId
+      || params?.turn_id
+  );
+}
+
+function normalizeRequestId(value) {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return "";
+}
+
+function extractResponseTurnId(result) {
+  const resultObject = objectValue(result);
+  return readString(
+    resultObject?.turnId
+      || resultObject?.turn_id
+      || resultObject?.turn?.id
+      || resultObject?.turn?.turnId
+      || resultObject?.turn?.turn_id
+  );
 }
 
 function envelopeEventObject(params) {
@@ -599,7 +786,10 @@ function buildNotificationBody({ result, state, params, eventObject, previewMaxC
     ) || "Run failed";
   }
 
-  return "Response ready";
+  return truncatePreview(
+    state?.latestAssistantPreview,
+    previewMaxChars
+  ) || "Response ready";
 }
 
 function truncatePreview(value, limit) {
