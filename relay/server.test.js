@@ -200,6 +200,121 @@ test("generic bridge event pushes are accepted while the mac relay session is li
   });
 });
 
+test("push delivery is skipped while an iphone relay client is already connected", async () => {
+  await withServer(async ({ port }) => {
+    const mac = new WebSocket(`ws://127.0.0.1:${port}/relay/session-live-iphone`, {
+      headers: {
+        "x-role": "mac",
+        "x-notification-secret": "bridge-secret",
+      },
+    });
+    await onceOpen(mac);
+
+    const iphone = new WebSocket(`ws://127.0.0.1:${port}/relay/session-live-iphone`, {
+      headers: {
+        "x-role": "iphone",
+      },
+    });
+    await onceOpen(iphone);
+
+    const accepted = await fetch(`http://127.0.0.1:${port}/v1/push/session/register-device`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "session-live-iphone",
+        notificationSecret: "bridge-secret",
+        deviceToken: "aabbcc",
+        alertsEnabled: true,
+      }),
+    });
+    assert.equal(accepted.status, 200);
+
+    const response = await fetch(`http://127.0.0.1:${port}/v1/push/session/notify-completion`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "session-live-iphone",
+        notificationSecret: "bridge-secret",
+        threadId: "thread-1",
+        dedupeKey: "live-iphone-1",
+      }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      ok: true,
+      skipped: true,
+      reason: "iphone_connected",
+    });
+
+    const iphoneClosed = onceClosed(iphone);
+    iphone.close();
+    await iphoneClosed;
+    const macClosed = onceClosed(mac);
+    mac.close();
+    await macClosed;
+  }, {
+    enablePushService: true,
+  });
+});
+
+test("push delivery is skipped while the iphone relay client is already connected", async () => {
+  await withServer(async ({ port }) => {
+    const mac = new WebSocket(`ws://127.0.0.1:${port}/relay/session-live-iphone`, {
+      headers: {
+        "x-role": "mac",
+        "x-notification-secret": "bridge-secret",
+      },
+    });
+    await onceOpen(mac);
+
+    const iphone = new WebSocket(`ws://127.0.0.1:${port}/relay/session-live-iphone`, {
+      headers: {
+        "x-role": "iphone",
+      },
+    });
+    await onceOpen(iphone);
+
+    const accepted = await fetch(`http://127.0.0.1:${port}/v1/push/session/register-device`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "session-live-iphone",
+        notificationSecret: "bridge-secret",
+        deviceToken: "aabbcc",
+        alertsEnabled: true,
+      }),
+    });
+    assert.equal(accepted.status, 200);
+
+    const response = await fetch(`http://127.0.0.1:${port}/v1/push/session/notify-completion`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "session-live-iphone",
+        notificationSecret: "bridge-secret",
+        threadId: "thread-live-iphone",
+        dedupeKey: "done-live-iphone",
+      }),
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      ok: true,
+      skipped: true,
+      reason: "iphone_connected",
+    });
+
+    const iphoneClosed = onceClosed(iphone);
+    iphone.close();
+    await iphoneClosed;
+
+    const macClosed = onceClosed(mac);
+    mac.close();
+    await macClosed;
+  }, {
+    enablePushService: true,
+  });
+});
+
 test("trusted session resolve returns the current live session for a trusted iphone", async () => {
   const phoneIdentity = makePhoneIdentity();
 
