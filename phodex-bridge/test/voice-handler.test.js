@@ -210,7 +210,7 @@ test("voice/transcribe rejects malformed or non-WAV audio before contacting the 
     },
     {
       name: "non-WAV payload",
-      audioBase64: Buffer.from("hello from remodex").toString("base64"),
+      audioBase64: Buffer.from("hello from pocketex").toString("base64"),
       message: /not a valid WAV file/,
     },
   ];
