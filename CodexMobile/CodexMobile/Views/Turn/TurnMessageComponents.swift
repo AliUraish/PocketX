@@ -10,9 +10,9 @@ import SwiftUI
 import Textual
 import UIKit
 
-// Keep Textual selection out of the scrolling timeline. This is shared by both
-// plain markdown rows and Mermaid-interleaved markdown segments.
-let enablesInlineMarkdownSelectionInTimeline = false
+// Keep Textual selection out of the scrolling timeline for Mermaid rows and
+// streaming rows. Prose assistant rows and user bubbles use native selection instead.
+private let enablesMermaidInlineSelection = false
 
 // ─── Message content views ──────────────────────────────────────────
 
@@ -679,12 +679,13 @@ struct MessageRow: View, Equatable {
                 if !text.isEmpty {
                     userBubbleText(text)
                         .font(AppFont.body())
+                        .textSelection(.enabled)
                         .padding(.vertical, 12)
                         .padding(.horizontal, 16)
                         .background {
                             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                .fill(Color(.tertiarySystemFill).opacity(0.8))
-                                .stroke(.secondary.opacity(0.08))
+                                .fill(DesignTokens.Colors.cardBackground)
+                                .stroke(DesignTokens.Colors.cardBorder, lineWidth: 1)
                         }
                 }
 
@@ -695,14 +696,6 @@ struct MessageRow: View, Equatable {
                 }
             }
             .contextMenu {
-                if message.role == .user, !text.isEmpty {
-                    Button {
-                        HapticFeedback.shared.triggerImpactFeedback(style: .light)
-                        UIPasteboard.general.string = text
-                    } label: {
-                        Label("Copy", systemImage: "doc.on.doc")
-                    }
-                }
                 if isRetryAvailable, message.role == .user, !text.isEmpty {
                     Button {
                         HapticFeedback.shared.triggerImpactFeedback(style: .light)
@@ -854,6 +847,7 @@ struct MessageRow: View, Equatable {
         let commentContent = renderModel.codeCommentContent
         let bodyText = commentContent?.fallbackText ?? text
         let mermaidContent = renderModel.mermaidContent
+        let shouldUseLightweightStreamingText = message.isStreaming
 
         return VStack(alignment: .leading, spacing: 8) {
             if let commentContent, commentContent.hasFindings {
@@ -865,13 +859,22 @@ struct MessageRow: View, Equatable {
             }
 
             if !bodyText.isEmpty {
-                if let mermaidContent {
+                if shouldUseLightweightStreamingText {
+                    Text(bodyText)
+                        .font(AppFont.body())
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.disabled)
+                } else if let mermaidContent {
                     MermaidMarkdownContentView(content: mermaidContent)
+                        .contextMenu {
+                            selectableTextActions(text: text, usesMarkdownSelection: true)
+                        }
                 } else {
                     MarkdownTextView(
                         text: bodyText,
                         profile: .assistantProse,
-                        enablesSelection: enablesInlineMarkdownSelectionInTimeline
+                        enablesSelection: true
                     )
                 }
             }
@@ -892,9 +895,6 @@ struct MessageRow: View, Equatable {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .contextMenu {
-            selectableTextActions(text: text, usesMarkdownSelection: true)
-        }
     }
 
     @ViewBuilder
