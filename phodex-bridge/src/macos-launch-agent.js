@@ -1,7 +1,7 @@
 // FILE: macos-launch-agent.js
-// Purpose: Owns macOS-only launchd install/start/stop/status helpers for the background rimcodex bridge.
+// Purpose: Owns macOS-only launchd install/start/stop/status helpers for the background pocketex bridge.
 // Layer: CLI helper
-// Exports: start/stop/status helpers plus the launchd service runner used by `rimcodex up`.
+// Exports: start/stop/status helpers plus the launchd service runner used by `pocketex up`.
 // Depends on: child_process, fs, os, path, ./bridge, ./daemon-state, ./codex-desktop-refresher, ./pairing-code, ./secure-device-state
 
 const { execFileSync } = require("child_process");
@@ -15,20 +15,20 @@ const { resetBridgeDeviceState } = require("./secure-device-state");
 const {
   clearBridgeStatus,
   clearPairingSession,
-  ensureRemodexLogsDir,
-  ensureRemodexStateDir,
+  ensurePocketexLogsDir,
+  ensurePocketexStateDir,
   readBridgeStatus,
   readDaemonConfig,
   readPairingSession,
   resolveBridgeStderrLogPath,
   resolveBridgeStdoutLogPath,
-  resolveRemodexStateDir,
+  resolvePocketexStateDir,
   writeBridgeStatus,
   writeDaemonConfig,
   writePairingSession,
 } = require("./daemon-state");
 
-const SERVICE_LABEL = "com.rimcodex.bridge";
+const SERVICE_LABEL = "com.pocketex.bridge";
 const DEFAULT_PAIRING_WAIT_TIMEOUT_MS = 10_000;
 const DEFAULT_PAIRING_WAIT_INTERVAL_MS = 200;
 
@@ -46,7 +46,7 @@ function runMacOSBridgeService({ env = process.env } = {}) {
       pid: process.pid,
       lastError: message,
     }, { env });
-    console.error(`[rimcodex] ${message}`);
+    console.error(`[pocketex] ${message}`);
     return;
   }
 
@@ -75,7 +75,7 @@ async function startMacOSBridgeService({
   execFileSyncImpl = execFileSync,
   osImpl = os,
   nodePath = process.execPath,
-  cliPath = path.resolve(__dirname, "..", "bin", "rimcodex.js"),
+  cliPath = path.resolve(__dirname, "..", "bin", "pocketex.js"),
   waitForPairing = false,
   pairingTimeoutMs = DEFAULT_PAIRING_WAIT_TIMEOUT_MS,
   pairingPollIntervalMs = DEFAULT_PAIRING_WAIT_INTERVAL_MS,
@@ -88,8 +88,8 @@ async function startMacOSBridgeService({
   writeDaemonConfig(config, { env, fsImpl });
   clearPairingSession({ env, fsImpl });
   clearBridgeStatus({ env, fsImpl });
-  ensureRemodexStateDir({ env, fsImpl, osImpl });
-  ensureRemodexLogsDir({ env, fsImpl, osImpl });
+  ensurePocketexStateDir({ env, fsImpl, osImpl });
+  ensurePocketexLogsDir({ env, fsImpl, osImpl });
 
   const plistPath = writeLaunchAgentPlist({
     env,
@@ -184,15 +184,15 @@ function printMacOSBridgeServiceStatus(options = {}) {
   const bridgeState = status.bridgeStatus?.state || "unknown";
   const connectionStatus = status.bridgeStatus?.connectionStatus || "unknown";
   const pairingCreatedAt = status.pairingSession?.createdAt || "none";
-  console.log(`[rimcodex] Service label: ${status.label}`);
-  console.log(`[rimcodex] Installed: ${status.installed ? "yes" : "no"}`);
-  console.log(`[rimcodex] Launchd loaded: ${status.launchdLoaded ? "yes" : "no"}`);
-  console.log(`[rimcodex] PID: ${status.launchdPid || status.bridgeStatus?.pid || "unknown"}`);
-  console.log(`[rimcodex] Bridge state: ${bridgeState}`);
-  console.log(`[rimcodex] Connection: ${connectionStatus}`);
-  console.log(`[rimcodex] Pairing session: ${pairingCreatedAt}`);
-  console.log(`[rimcodex] Stdout log: ${status.stdoutLogPath}`);
-  console.log(`[rimcodex] Stderr log: ${status.stderrLogPath}`);
+  console.log(`[pocketex] Service label: ${status.label}`);
+  console.log(`[pocketex] Installed: ${status.installed ? "yes" : "no"}`);
+  console.log(`[pocketex] Launchd loaded: ${status.launchdLoaded ? "yes" : "no"}`);
+  console.log(`[pocketex] PID: ${status.launchdPid || status.bridgeStatus?.pid || "unknown"}`);
+  console.log(`[pocketex] Bridge state: ${bridgeState}`);
+  console.log(`[pocketex] Connection: ${connectionStatus}`);
+  console.log(`[pocketex] Pairing session: ${pairingCreatedAt}`);
+  console.log(`[pocketex] Stdout log: ${status.stdoutLogPath}`);
+  console.log(`[pocketex] Stderr log: ${status.stderrLogPath}`);
 }
 
 function printMacOSBridgePairingCode({ pairingSession = null, env = process.env, fsImpl = fs } = {}) {
@@ -210,10 +210,10 @@ function writeLaunchAgentPlist({
   fsImpl = fs,
   osImpl = os,
   nodePath = process.execPath,
-  cliPath = path.resolve(__dirname, "..", "bin", "rimcodex.js"),
+  cliPath = path.resolve(__dirname, "..", "bin", "pocketex.js"),
 } = {}) {
   const plistPath = resolveLaunchAgentPlistPath({ env, osImpl });
-  const stateDir = resolveRemodexStateDir({ env, osImpl });
+  const stateDir = resolvePocketexStateDir({ env, osImpl });
   const stdoutLogPath = resolveBridgeStdoutLogPath({ env, osImpl });
   const stderrLogPath = resolveBridgeStderrLogPath({ env, osImpl });
   const homeDir = env.HOME || osImpl.homedir();
@@ -268,7 +268,7 @@ function buildLaunchAgentPlist({
     <string>${escapeXml(homeDir)}</string>
     <key>PATH</key>
     <string>${escapeXml(pathEnv)}</string>
-    <key>RIMCODEX_DEVICE_STATE_DIR</key>
+    <key>POCKETEX_DEVICE_STATE_DIR</key>
     <string>${escapeXml(stateDir)}</string>
   </dict>
   <key>StandardOutPath</key>
@@ -392,7 +392,7 @@ function assertRelayConfigured(config) {
   if (typeof config?.relayUrl === "string" && config.relayUrl.trim()) {
     return;
   }
-  throw new Error("No relay URL configured. Run ./run-local-rimcodex.sh or set RIMCODEX_RELAY before enabling the macOS bridge service.");
+  throw new Error("No relay URL configured. Run ./run-local-pocketex.sh or set POCKETEX_RELAY before enabling the macOS bridge service.");
 }
 
 function launchAgentDomain(env) {
