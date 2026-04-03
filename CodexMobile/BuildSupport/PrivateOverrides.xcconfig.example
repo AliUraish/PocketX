@@ -1,7 +1,7 @@
 // Copy this file to PrivateOverrides.xcconfig and keep the real values local.
 // Xcode will load the private file automatically when it exists.
 
-RIMCODEX_DEFAULT_RELAY_URL =
-RIMCODEX_SOURCE_REPOSITORY_URL =
-RIMCODEX_PRIVACY_POLICY_URL =
-RIMCODEX_TERMS_OF_USE_URL =
+POCKETEX_DEFAULT_RELAY_URL =
+POCKETEX_SOURCE_REPOSITORY_URL =
+POCKETEX_PRIVACY_POLICY_URL =
+POCKETEX_TERMS_OF_USE_URL =
