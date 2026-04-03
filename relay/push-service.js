@@ -1,5 +1,5 @@
 // FILE: push-service.js
-// Purpose: Stores session-scoped APNs registration state and sends bridge event pushes for relay-hosted rimcodex sessions.
+// Purpose: Stores session-scoped APNs registration state and sends bridge event pushes for relay-hosted pocketex sessions.
 // Layer: Hosted service helper
 // Exports: createPushSessionService, createFileBackedPushStateStore, resolvePushStateFilePath
 // Depends on: crypto, fs, os, path, ./apns-client
@@ -346,16 +346,16 @@ function createFileBackedPushStateStore({ stateFilePath } = {}) {
 
 function apnsConfigFromEnv(env) {
   return {
-    teamId: readFirstDefinedEnv(["RIMCODEX_APNS_TEAM_ID", "REMODEX_APNS_TEAM_ID", "PHODEX_APNS_TEAM_ID"], env),
-    keyId: readFirstDefinedEnv(["RIMCODEX_APNS_KEY_ID", "REMODEX_APNS_KEY_ID", "PHODEX_APNS_KEY_ID"], env),
-    bundleId: readFirstDefinedEnv(["RIMCODEX_APNS_BUNDLE_ID", "REMODEX_APNS_BUNDLE_ID", "PHODEX_APNS_BUNDLE_ID"], env),
+    teamId: readFirstDefinedEnv(["POCKETEX_APNS_TEAM_ID", "PHODEX_APNS_TEAM_ID"], env),
+    keyId: readFirstDefinedEnv(["POCKETEX_APNS_KEY_ID", "PHODEX_APNS_KEY_ID"], env),
+    bundleId: readFirstDefinedEnv(["POCKETEX_APNS_BUNDLE_ID", "PHODEX_APNS_BUNDLE_ID"], env),
     privateKey: readAPNsPrivateKey(env),
   };
 }
 
 function readAPNsPrivateKey(env) {
   const rawValue = readFirstDefinedEnv(
-    ["RIMCODEX_APNS_PRIVATE_KEY", "REMODEX_APNS_PRIVATE_KEY", "PHODEX_APNS_PRIVATE_KEY"],
+    ["POCKETEX_APNS_PRIVATE_KEY", "PHODEX_APNS_PRIVATE_KEY"],
     env
   );
   if (rawValue) {
@@ -363,7 +363,7 @@ function readAPNsPrivateKey(env) {
   }
 
   const filePath = readFirstDefinedEnv(
-    ["RIMCODEX_APNS_PRIVATE_KEY_FILE", "REMODEX_APNS_PRIVATE_KEY_FILE", "PHODEX_APNS_PRIVATE_KEY_FILE"],
+    ["POCKETEX_APNS_PRIVATE_KEY_FILE", "PHODEX_APNS_PRIVATE_KEY_FILE"],
     env
   );
   if (!filePath) {
@@ -414,17 +414,17 @@ function fallbackBodyForResult(result) {
 function fallbackTitleForEventType(eventType) {
   switch (eventType) {
     case "approval_needed":
-      return "rimcodex approval needed";
+      return "pocketex approval needed";
     case "structured_user_input_needed":
-      return "rimcodex input needed";
+      return "pocketex input needed";
     case "bridge_offline":
-      return "rimcodex went offline";
+      return "pocketex went offline";
     case "reconnect_succeeded":
-      return "rimcodex reconnected";
+      return "pocketex reconnected";
     case "reconnect_failed":
-      return "rimcodex reconnect failed";
+      return "pocketex reconnect failed";
     default:
-      return "rimcodex";
+      return "pocketex";
   }
 }
 
@@ -449,7 +449,7 @@ function fallbackBodyForEventType(eventType, eventPayload) {
     case "reconnect_failed":
       return "The Mac bridge could not be restored.";
     default:
-      return "New rimcodex event.";
+      return "New pocketex event.";
   }
 }
 
@@ -476,7 +476,7 @@ function notificationSourceForEventType(eventType) {
 
 function resolvePushStateFilePath(env = process.env) {
   const explicitPath = readFirstDefinedEnv(
-    ["RIMCODEX_PUSH_STATE_FILE", "REMODEX_PUSH_STATE_FILE", "PHODEX_PUSH_STATE_FILE"],
+    ["POCKETEX_PUSH_STATE_FILE", "PHODEX_PUSH_STATE_FILE"],
     env
   );
   if (explicitPath) {
@@ -484,7 +484,7 @@ function resolvePushStateFilePath(env = process.env) {
   }
 
   const codexHome = readString(env.CODEX_HOME) || path.join(os.homedir(), ".codex");
-  return path.join(codexHome, "rimcodex", "push-state.json");
+  return path.join(codexHome, "pocketex", "push-state.json");
 }
 
 function normalizeEntryList(value) {
