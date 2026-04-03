@@ -48,12 +48,12 @@ struct ComposerBottomBar: View {
 
     private var sendButtonIconColor: Color {
         if isSendDisabled { return Color(.systemGray2) }
-        return Color(.systemBackground)
+        return .white
     }
 
     private var sendButtonBackgroundColor: Color {
         if isSendDisabled { return Color(.systemGray5) }
-        return Color(.label)
+        return DesignTokens.Colors.glassAccent
     }
 
     // MARK: - Body
@@ -101,9 +101,9 @@ struct ComposerBottomBar: View {
                 } label: {
                     Image(systemName: "stop.fill")
                         .font(AppFont.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(.systemBackground))
+                        .foregroundStyle(.white)
                         .frame(width: 32, height: 32)
-                        .background(Color(.label), in: Circle())
+                        .background(DesignTokens.Colors.glassAccent, in: Circle())
                 }
             }
 
