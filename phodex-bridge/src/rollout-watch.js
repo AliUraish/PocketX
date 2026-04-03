@@ -196,9 +196,9 @@ function watchThreadRollout(threadId = "") {
   let offset = fs.statSync(rolloutPath).size;
   let partialLine = "";
 
-  console.log(`[rimcodex] Watching thread ${resolvedThreadId}`);
-  console.log(`[rimcodex] Rollout file: ${rolloutPath}`);
-  console.log("[rimcodex] Waiting for new persisted events... (Ctrl+C to stop)");
+  console.log(`[pocketex] Watching thread ${resolvedThreadId}`);
+  console.log(`[pocketex] Rollout file: ${rolloutPath}`);
+  console.log("[pocketex] Waiting for new persisted events... (Ctrl+C to stop)");
 
   const onChange = (current, previous) => {
     if (current.size <= previous.size) {
@@ -252,7 +252,7 @@ function resolveThreadId(threadId) {
     return last.threadId;
   }
 
-  throw new Error("No thread id provided and no remembered rimcodex thread found.");
+  throw new Error("No thread id provided and no remembered pocketex thread found.");
 }
 
 function resolveSessionsRoot() {
