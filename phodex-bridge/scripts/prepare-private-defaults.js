@@ -4,8 +4,8 @@ const fs = require("fs");
 const path = require("path");
 
 const outputPath = path.join(__dirname, "..", "src", "private-defaults.json");
-const relayUrl = readString(process.env.REMODEX_PACKAGE_DEFAULT_RELAY_URL);
-const pushServiceUrl = readString(process.env.REMODEX_PACKAGE_DEFAULT_PUSH_SERVICE_URL);
+const relayUrl = readString(process.env.POCKETEX_PACKAGE_DEFAULT_RELAY_URL);
+const pushServiceUrl = readString(process.env.POCKETEX_PACKAGE_DEFAULT_PUSH_SERVICE_URL);
 
 if (!relayUrl && !pushServiceUrl) {
   removeIfPresent(outputPath);
