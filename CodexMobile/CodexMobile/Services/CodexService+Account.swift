@@ -6,7 +6,7 @@
 
 import Foundation
 
-private let minimumBridgePackageUpdateCommand = "npm install -g rimcodex@latest"
+private let minimumBridgePackageUpdateCommand = "npm install -g pocketex@latest"
 
 enum CodexGPTAccountStatus: String, Codable, Sendable {
     case unknown
@@ -169,7 +169,7 @@ extension CodexService {
         }
     }
 
-    // Refreshes only the bridge package version state so rimcodex updates stay independent from GPT UX.
+    // Refreshes only the bridge package version state so pocketex updates stay independent from GPT UX.
     func refreshBridgeVersionState(allowAvailableBridgeUpdatePrompt: Bool = false) async {
         guard isConnected else {
             return
@@ -730,14 +730,14 @@ extension CodexService {
         if let currentVersion = currentVersion?.trimmingCharacters(in: .whitespacesAndNewlines),
            !currentVersion.isEmpty {
             message =
-                "This Mac bridge is running rimcodex \(currentVersion), but this iPhone app requires rimcodex \(CodexService.minimumSupportedBridgePackageVersion) or newer. Update the npm package on your Mac, then reconnect."
+                "This Mac bridge is running pocketex \(currentVersion), but this iPhone app requires pocketex \(CodexService.minimumSupportedBridgePackageVersion) or newer. Update the npm package on your Mac, then reconnect."
         } else {
             message =
-                "This Mac bridge is too old for this version of the rimcodex iPhone app. Update the rimcodex npm package on your Mac to \(CodexService.minimumSupportedBridgePackageVersion) or newer, then reconnect."
+                "This Mac bridge is too old for this version of the pocketex iPhone app. Update the pocketex npm package on your Mac to \(CodexService.minimumSupportedBridgePackageVersion) or newer, then reconnect."
         }
 
         return CodexBridgeUpdatePrompt(
-            title: "Update rimcodex on your Mac to reconnect",
+            title: "Update pocketex on your Mac to reconnect",
             message: message,
             command: minimumBridgePackageUpdateCommand
         )
@@ -785,8 +785,8 @@ extension CodexService {
         latestVersion: String
     ) -> CodexBridgeUpdatePrompt {
         CodexBridgeUpdatePrompt(
-            title: "A newer rimcodex update is available on your Mac",
-            message: "This Mac bridge is running rimcodex \(currentVersion), and npm now has rimcodex \(latestVersion). Update the package on your Mac when you're ready, then reconnect to start using the newer build.",
+            title: "A newer pocketex update is available on your Mac",
+            message: "This Mac bridge is running pocketex \(currentVersion), and npm now has pocketex \(latestVersion). Update the package on your Mac when you're ready, then reconnect to start using the newer build.",
             command: minimumBridgePackageUpdateCommand
         )
     }
