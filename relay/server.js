@@ -10,6 +10,7 @@ const {
   setupRelay,
   getRelayStats,
   hasAuthenticatedMacSession,
+  hasLiveIphoneSession,
   claimPairingCode,
   resolveTrustedMacSession,
 } = require("./relay");
@@ -35,6 +36,11 @@ function createRelayServer({
       // Completion pushes are only valid while the Mac side of that relay session is still live.
       canNotifyCompletion({ sessionId, notificationSecret }) {
         return hasAuthenticatedMacSession(sessionId, notificationSecret);
+      },
+      // Skip managed push while the iPhone is already live on the relay to avoid
+      // duplicating the phone's own in-app/background notification handling.
+      shouldDeliverPush({ sessionId }) {
+        return !hasLiveIphoneSession(sessionId);
       },
     }))
     : createDisabledPushSessionService();
