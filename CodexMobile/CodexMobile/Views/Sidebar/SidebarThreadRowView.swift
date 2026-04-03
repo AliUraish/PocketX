@@ -42,8 +42,12 @@ struct SidebarThreadRowView: View, Equatable {
         }
         .background {
             if isSelected {
-                Color.clear
-                    .adaptiveGlass(.regular, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.row, style: .continuous))
+                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.row, style: .continuous)
+                    .fill(DesignTokens.Colors.glassAccent.opacity(0.15))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.row, style: .continuous)
+                            .stroke(DesignTokens.Colors.selectedBorder, lineWidth: 1.5)
+                    )
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.md)
