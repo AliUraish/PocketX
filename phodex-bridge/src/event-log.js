@@ -7,7 +7,7 @@
 const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
-const { resolveRemodexStateDir } = require("./daemon-state");
+const { resolvePocketexStateDir } = require("./daemon-state");
 
 const EVENT_LOG_FILE = "event-log.json";
 const DEFAULT_MAX_EVENT_COUNT = 300;
@@ -54,7 +54,7 @@ function createBridgeEventLogStore({
 }
 
 function resolveEventLogPath(options = {}) {
-  return path.join(resolveRemodexStateDir(options), EVENT_LOG_FILE);
+  return path.join(resolvePocketexStateDir(options), EVENT_LOG_FILE);
 }
 
 function readEventLogFile({ fsImpl = fs, ...options } = {}) {
