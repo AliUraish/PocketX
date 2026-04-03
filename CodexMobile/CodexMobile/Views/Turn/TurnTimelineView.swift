@@ -339,11 +339,13 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
                 Text(errorMessage)
                     .font(AppFont.caption())
                     .foregroundStyle(.red)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 24)
                     .padding(.top, 4)
             }
 
             composer()
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
         }
 
         return footerContent
