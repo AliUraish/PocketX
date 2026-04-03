@@ -1,5 +1,5 @@
 // FILE: session-state.js
-// Purpose: Persists the latest active rimcodex thread so the user can reopen it on the Mac for handoff.
+// Purpose: Persists the latest active pocketex thread so the user can reopen it on the Mac for handoff.
 // Layer: CLI helper
 // Exports: rememberActiveThread, openLastActiveThread, readLastActiveThread
 // Depends on: fs, os, path, child_process
@@ -9,8 +9,8 @@ const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
-const STATE_DIR = path.join(os.homedir(), ".rimcodex");
-const STATE_FILE = path.join(STATE_DIR, "last-thread.json");
+const DEFAULT_STATE_DIR = path.join(os.homedir(), ".pocketex");
+const STATE_FILE_NAME = "last-thread.json";
 const DEFAULT_BUNDLE_ID = "com.openai.codex";
 
 function rememberActiveThread(threadId, source) {
@@ -24,8 +24,8 @@ function rememberActiveThread(threadId, source) {
     updatedAt: new Date().toISOString(),
   };
 
-  fs.mkdirSync(STATE_DIR, { recursive: true });
-  fs.writeFileSync(STATE_FILE, JSON.stringify(payload, null, 2));
+  fs.mkdirSync(resolveStateDir(), { recursive: true });
+  fs.writeFileSync(resolveStateFile(), JSON.stringify(payload, null, 2));
   return true;
 }
 
@@ -33,7 +33,7 @@ function openLastActiveThread({ bundleId = DEFAULT_BUNDLE_ID } = {}) {
   const state = readState();
   const threadId = state?.threadId;
   if (!threadId) {
-    throw new Error("No remembered rimcodex thread found yet.");
+    throw new Error("No remembered pocketex thread found yet.");
   }
 
   const targetUrl = `codex://threads/${threadId}`;
@@ -42,12 +42,21 @@ function openLastActiveThread({ bundleId = DEFAULT_BUNDLE_ID } = {}) {
 }
 
 function readState() {
-  if (!fs.existsSync(STATE_FILE)) {
+  const stateFile = resolveStateFile();
+  if (!fs.existsSync(stateFile)) {
     return null;
   }
 
-  const raw = fs.readFileSync(STATE_FILE, "utf8");
+  const raw = fs.readFileSync(stateFile, "utf8");
   return JSON.parse(raw);
+}
+
+function resolveStateDir() {
+  return DEFAULT_STATE_DIR;
+}
+
+function resolveStateFile() {
+  return path.join(resolveStateDir(), STATE_FILE_NAME);
 }
 
 module.exports = {
