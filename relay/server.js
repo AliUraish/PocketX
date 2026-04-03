@@ -1,5 +1,5 @@
 // FILE: server.js
-// Purpose: Hosts the public rimcodex relay plus optional push-notification HTTP endpoints.
+// Purpose: Hosts the public pocketex relay plus optional push-notification HTTP endpoints.
 // Layer: Standalone server entrypoint
 // Exports: createRelayServer, createFixedWindowRateLimiter
 // Depends on: http, ws, ./relay, ./push-service
@@ -375,12 +375,11 @@ function createFixedWindowRateLimiter({ windowMs, maxRequests, now = () => Date.
 if (require.main === module) {
   const port = Number(process.env.PORT || 9000);
   const trustProxy = readOptionalBooleanEnv([
-    "RIMCODEX_TRUST_PROXY",
-    "REMODEX_TRUST_PROXY",
+    "POCKETEX_TRUST_PROXY",
     "PHODEX_TRUST_PROXY",
   ]) ?? false;
   const enablePushService = readOptionalBooleanEnv(
-    ["RIMCODEX_ENABLE_PUSH_SERVICE", "REMODEX_ENABLE_PUSH_SERVICE", "PHODEX_ENABLE_PUSH_SERVICE"]
+    ["POCKETEX_ENABLE_PUSH_SERVICE", "PHODEX_ENABLE_PUSH_SERVICE"]
   ) ?? false;
   const { server } = createRelayServer({ enablePushService, trustProxy });
   server.listen(port, () => {
