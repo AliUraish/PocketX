@@ -147,6 +147,7 @@ extension CodexService {
         activeThreadId = threadId
         markThreadAsRunning(threadId)
         setProtectedRunningFallback(true, for: threadId)
+        rememberPhoneOriginatedRunNotificationEligibility(threadId: threadId)
 
         do {
             // Reuse the turn/start compatibility path so review runs honor the selected access mode.
@@ -190,6 +191,7 @@ extension CodexService {
         )
 
         if let resolvedTurnID {
+            bindPhoneOriginatedRunNotificationEligibility(turnId: resolvedTurnID, for: threadId)
             activeTurnId = resolvedTurnID
             setActiveTurnID(resolvedTurnID, for: threadId)
             threadIdByTurnID[resolvedTurnID] = threadId
