@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="CodexMobile/CodexMobile/Assets.xcassets/remodex-og1.imageset/remodex-og2%20%281%29.png" alt="Remodex" />
+  <img src="CodexMobile/CodexMobile/Assets.xcassets/pocketex-og1.imageset/pocketex-og2%20%281%29.png" alt="Pocketex" />
 </p>
 
-# Remodex
+# Pocketex
 
 Sync test marker: README updated from the Mac bridge session.
 
-[![npm version](https://img.shields.io/npm/v/remodex)](https://www.npmjs.com/package/remodex)
+[![npm version](https://img.shields.io/npm/v/pocketex)](https://www.npmjs.com/package/pocketex)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
 [Follow on X](https://x.com/emanueledpt)
 
-Control [Codex](https://openai.com/index/codex/) from your iPhone. Remodex is a local-first open-source bridge + iOS app that keeps the Codex runtime on your Mac and lets your phone connect through a paired secure session.
+Control [Codex](https://openai.com/index/codex/) from your iPhone. Pocketex is a local-first open-source bridge + iOS app that keeps the Codex runtime on your Mac and lets your phone connect through a paired secure session.
 
 ## Key App Features
 
@@ -42,9 +42,9 @@ If you want the public-repo distribution model explained clearly, read [SELF_HOS
 
 ## Get the App
 
-The app is live on the [App Store](https://apps.apple.com/us/app/remodex-remote-ai-coding/id6760243963).
+The app is live on the [App Store](https://apps.apple.com/us/app/pocketex-remote-ai-coding/id6760243963).
 
-Build the iOS app from source in Xcode, install your own signed build on-device, then use the in-app onboarding flow to pair by scanning the QR from `remodex up`.
+Build the iOS app from source in Xcode, install your own signed build on-device, then use the in-app onboarding flow to pair by scanning the QR from `pocketex up`.
 
 If you scan the pairing QR with a generic camera or QR reader before installing the app, your device may treat the QR payload as plain text and open a web search instead of pairing.
 
@@ -52,7 +52,7 @@ If you scan the pairing QR with a generic camera or QR reader before installing 
 
 ```
 ┌──────────────┐       Paired session   ┌───────────────┐       stdin/stdout       ┌─────────────┐
-│  Remodex iOS │ ◄────────────────────► │ remodex (Mac) │ ◄──────────────────────► │ codex       │
+│  Pocketex iOS │ ◄────────────────────► │ pocketex (Mac) │ ◄──────────────────────► │ codex       │
 │  app         │    WebSocket bridge    │ bridge        │    JSON-RPC              │ app-server  │
 └──────────────┘                        └───────────────┘                          └─────────────┘
                                                │                                         │
@@ -64,9 +64,9 @@ If you scan the pairing QR with a generic camera or QR reader before installing 
                                         └─────────────┘                           └─────────────┘
 ```
 
-1. Run `remodex up` on your Mac
-2. On macOS, Remodex installs/starts a lightweight background bridge service and prints a QR for first-time pairing or recovery
-3. Scan the QR once with the Remodex iOS app to trust that Mac
+1. Run `pocketex up` on your Mac
+2. On macOS, Pocketex installs/starts a lightweight background bridge service and prints a QR for first-time pairing or recovery
+3. Scan the QR once with the Pocketex iOS app to trust that Mac
 4. After the first handshake, the iPhone can resolve the Mac's live session through the configured relay and reconnect automatically
 5. Your phone sends instructions to Codex through the bridge and receives responses in real-time
 6. The bridge handles git operations and local session persistence on your Mac
@@ -77,7 +77,7 @@ If you scan the pairing QR with a generic camera or QR reader before installing 
 This repo contains the local bridge, the iOS app target, and their tests:
 
 ```
-├── phodex-bridge/                # Node.js bridge package used by `remodex`
+├── phodex-bridge/                # Node.js bridge package used by `pocketex`
 │   ├── bin/                      # CLI entrypoints
 │   └── src/                      # Bridge runtime, git/workspace handlers, refresh helpers
 ├── CodexMobile/                  # Xcode project root
@@ -96,7 +96,7 @@ This repo contains the local bridge, the iOS app target, and their tests:
 - **Node.js** v18+
 - **[Codex CLI](https://github.com/openai/codex)** installed and in your PATH
 - **[Codex desktop app](https://openai.com/index/codex/)** (optional — for viewing threads on your Mac)
-- **A signed Remodex iOS build** installed on your iPhone or iPad before scanning the pairing QR
+- **A signed Pocketex iOS build** installed on your iPhone or iPad before scanning the pairing QR
 - **macOS** (for desktop refresh features — the core bridge works on any OS)
 - **Xcode 16+** (only if building the iOS app from source)
 
@@ -105,26 +105,26 @@ This repo contains the local bridge, the iOS app target, and their tests:
 <sub>Install from npm with `@latest` so you get the newest bridge fixes.</sub>
 
 ```sh
-npm install -g remodex@latest
+npm install -g pocketex@latest
 ```
 
 To update an existing global install later:
 
 ```sh
-npm install -g remodex@latest
+npm install -g pocketex@latest
 ```
 
-If you only want to try Remodex, you can install it from npm and run it without cloning this repository.
+If you only want to try Pocketex, you can install it from npm and run it without cloning this repository.
 
 ## Quick Start
 
 Install the bridge, then run:
 
 ```sh
-remodex up
+pocketex up
 ```
 
-On first connect, open the Remodex app, follow the onboarding flow, then scan the QR code from inside the app.
+On first connect, open the Pocketex app, follow the onboarding flow, then scan the QR code from inside the app.
 
 After that first scan:
 
@@ -138,9 +138,9 @@ For now, the daemon-backed trusted reconnect path is macOS-only. If you self-hos
 ## Run Locally
 
 ```sh
-git clone https://github.com/Emanuele-web04/remodex.git
-cd remodex
-./run-local-remodex.sh
+git clone https://github.com/Emanuele-web04/pocketex.git
+cd pocketex
+./run-local-pocketex.sh
 ```
 
 That launcher starts a local relay, points the bridge at `ws://<your-host>:9000/relay`, and prints the pairing QR for the iPhone app.
@@ -149,8 +149,8 @@ For iPhone self-hosting, the recommended path is Tailscale or another stable pri
 
 Options:
 
-- `./run-local-remodex.sh --hostname <lan-hostname-or-ip>`
-- `./run-local-remodex.sh --bind-host 127.0.0.1 --port 9100`
+- `./run-local-pocketex.sh --hostname <lan-hostname-or-ip>`
+- `./run-local-pocketex.sh --bind-host 127.0.0.1 --port 9100`
 
 If your iPhone is pairing over LAN, use a hostname or IP the phone can actually reach.
 
@@ -158,10 +158,10 @@ If your iPhone is pairing over LAN, use a hostname or IP the phone can actually 
 
 For a full public self-hosting walkthrough, see [`Docs/self-hosting.md`](Docs/self-hosting.md).
 
-If you want the npm bridge to point at your own setup instead of the package default, override `REMODEX_RELAY` explicitly:
+If you want the npm bridge to point at your own setup instead of the package default, override `POCKETEX_RELAY` explicitly:
 
 ```sh
-REMODEX_RELAY="ws://localhost:9000/relay" remodex up
+POCKETEX_RELAY="ws://localhost:9000/relay" pocketex up
 ```
 
 For self-hosted iPhone usage, prefer a relay URL reachable over Tailscale or another stable private network. Treat plain local `ws://192.168.x.x` pairing as best-effort rather than the recommended production path on iOS.
@@ -170,7 +170,7 @@ A common private setup looks like this:
 
 1. Run the relay on your Mac, a mini server, or a VPS you control
 2. Put that machine on Tailscale
-3. Set `REMODEX_RELAY` to the Tailscale-reachable `ws://` or `wss://` relay URL
+3. Set `POCKETEX_RELAY` to the Tailscale-reachable `ws://` or `wss://` relay URL
 4. Pair once with QR
 5. Let the iPhone reconnect to the same trusted Mac over that relay later
 
@@ -179,18 +179,18 @@ If that relay is fronting a Mac bridge, the macOS daemon can keep the bridge ali
 Reverse-proxy subpaths work too, so a hosted relay behind Traefik can live under the same domain as other APIs:
 
 ```sh
-REMODEX_RELAY="wss://api.example.com/remodex/relay" remodex up
+POCKETEX_RELAY="wss://api.example.com/pocketex/relay" pocketex up
 ```
 
 In that setup, the public endpoints can look like this:
 
-- `wss://api.example.com/remodex/relay`
-- `https://api.example.com/remodex/v1/push/session/register-device`
-- `https://api.example.com/remodex/v1/push/session/notify-completion`
+- `wss://api.example.com/pocketex/relay`
+- `https://api.example.com/pocketex/v1/push/session/register-device`
+- `https://api.example.com/pocketex/v1/push/session/notify-completion`
 
-Have the proxy strip `/remodex` before forwarding so the relay still receives `/relay/...` and `/v1/push/...`.
+Have the proxy strip `/pocketex` before forwarding so the relay still receives `/relay/...` and `/v1/push/...`.
 
-If you point `REMODEX_RELAY` at your own self-hosted relay, managed push stays off unless you also set `REMODEX_PUSH_SERVICE_URL` on the bridge and explicitly enable push on the relay.
+If you point `POCKETEX_RELAY` at your own self-hosted relay, managed push stays off unless you also set `POCKETEX_PUSH_SERVICE_URL` on the bridge and explicitly enable push on the relay.
 
 ## Publish to npm
 
@@ -203,34 +203,34 @@ To publish the bridge with `api.phodex.app` as the default relay:
 ```sh
 cd phodex-bridge
 npm login
-REMODEX_PACKAGE_DEFAULT_RELAY_URL="wss://api.phodex.app/relay" \
+POCKETEX_PACKAGE_DEFAULT_RELAY_URL="wss://api.phodex.app/relay" \
 npm publish
 ```
 
-After publish, users can still override the packaged default at runtime with `REMODEX_RELAY`.
+After publish, users can still override the packaged default at runtime with `POCKETEX_RELAY`.
 
 You can also run the bridge from source:
 
 ```sh
 cd phodex-bridge
 npm install
-REMODEX_RELAY="ws://localhost:9000/relay" npm start
+POCKETEX_RELAY="ws://localhost:9000/relay" npm start
 ```
 
 ## Commands
 
-### `remodex up`
+### `pocketex up`
 
-Starts Remodex.
+Starts Pocketex.
 
-On macOS, `remodex up` is the friendly entrypoint for the background bridge service:
+On macOS, `pocketex up` is the friendly entrypoint for the background bridge service:
 
 - Writes the daemon config used by the `launchd` service
 - Starts or restarts the background bridge service
 - Waits for a pairing payload and prints a QR for first-time trust or recovery
 - Keeps the bridge alive even if you close the terminal later
 
-On non-macOS platforms, `remodex up` runs the bridge in the foreground.
+On non-macOS platforms, `pocketex up` runs the bridge in the foreground.
 
 In both cases the bridge:
 
@@ -240,61 +240,61 @@ In both cases the bridge:
 - Handles git commands from the phone
 - Persists the active thread for later resumption
 
-### `remodex start`
+### `pocketex start`
 
 macOS only. Starts the background bridge service without waiting for or printing a QR in the current terminal.
 If the service is already loaded, this path refreshes it in place.
 
-### `remodex restart`
+### `pocketex restart`
 
 macOS only. Explicitly restarts the background bridge service without waiting for or printing a QR in the current terminal.
 
-### `remodex stop`
+### `pocketex stop`
 
 macOS only. Stops the background bridge service and clears its transient runtime status.
 
-### `remodex status`
+### `pocketex status`
 
 macOS only. Prints the current `launchd` / bridge status, including whether the service is loaded and whether a recent pairing payload exists.
 
-### `remodex run-service`
+### `pocketex run-service`
 
 macOS only. Internal service entrypoint used by `launchd`. You normally do not run this manually.
 
-### `remodex --version`
+### `pocketex --version`
 
-Prints the installed Remodex CLI version.
+Prints the installed Pocketex CLI version.
 
 ```sh
-remodex --version
+pocketex --version
 # => 1.3.4
 ```
 
-### `remodex reset-pairing`
+### `pocketex reset-pairing`
 
 Clears the saved bridge pairing state so the next trusted connection requires a fresh QR bootstrap again.
-You normally do not need this for corrupted local state anymore: recent Remodex builds auto-repair unreadable pairing files/mirrors on startup.
+You normally do not need this for corrupted local state anymore: recent Pocketex builds auto-repair unreadable pairing files/mirrors on startup.
 
 ```sh
-remodex reset-pairing
-# => [remodex] Cleared the saved pairing state. Run `remodex up` to pair again.
+pocketex reset-pairing
+# => [pocketex] Cleared the saved pairing state. Run `pocketex up` to pair again.
 ```
 
-### `remodex resume`
+### `pocketex resume`
 
 Reopens the last active thread in Codex.app on your Mac.
 
 ```sh
-remodex resume
-# => [remodex] Opened last active thread: abc-123 (phone)
+pocketex resume
+# => [pocketex] Opened last active thread: abc-123 (phone)
 ```
 
-### `remodex watch [threadId]`
+### `pocketex watch [threadId]`
 
 Tails the event log for a thread in real-time.
 
 ```sh
-remodex watch
+pocketex watch
 # => [14:32:01] Phone: "Fix the login bug in auth.ts"
 # => [14:32:05] Codex: "I'll look at auth.ts and fix the login..."
 # => [14:32:18] Task started
@@ -303,58 +303,58 @@ remodex watch
 
 ## Environment Variables
 
-`REMODEX_RELAY` is optional, but the default depends on how you got Remodex:
+`POCKETEX_RELAY` is optional, but the default depends on how you got Pocketex:
 
 - public GitHub/source checkouts stay open-source and self-host friendly, so they do not ship with a hosted relay baked in
 - official published packages may include a default relay at publish time
-- if you are running from source, assume you should use `./run-local-remodex.sh` or set `REMODEX_RELAY` yourself
+- if you are running from source, assume you should use `./run-local-pocketex.sh` or set `POCKETEX_RELAY` yourself
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `REMODEX_RELAY` | empty in source checkouts; optional in published packages | Session base URL used for QR bootstrap, trusted-session resolve, and phone/Mac session routing |
-| `REMODEX_PUSH_SERVICE_URL` | disabled by default | Optional HTTP base URL for managed push registration/completion |
-| `REMODEX_CODEX_ENDPOINT` | — | Connect to an existing Codex WebSocket instead of spawning a local `codex app-server` |
-| `REMODEX_REFRESH_ENABLED` | `false` | Auto-refresh Codex.app when phone activity is detected (`true` enables it explicitly) |
-| `REMODEX_REFRESH_DEBOUNCE_MS` | `1200` | Debounce window (ms) for coalescing refresh events |
-| `REMODEX_REFRESH_COMMAND` | — | Custom shell command to run instead of the built-in AppleScript refresh |
-| `REMODEX_CODEX_BUNDLE_ID` | `com.openai.codex` | macOS bundle ID of the Codex app |
+| `POCKETEX_RELAY` | empty in source checkouts; optional in published packages | Session base URL used for QR bootstrap, trusted-session resolve, and phone/Mac session routing |
+| `POCKETEX_PUSH_SERVICE_URL` | disabled by default | Optional HTTP base URL for managed push registration/completion |
+| `POCKETEX_CODEX_ENDPOINT` | — | Connect to an existing Codex WebSocket instead of spawning a local `codex app-server` |
+| `POCKETEX_REFRESH_ENABLED` | `false` | Auto-refresh Codex.app when phone activity is detected (`true` enables it explicitly) |
+| `POCKETEX_REFRESH_DEBOUNCE_MS` | `1200` | Debounce window (ms) for coalescing refresh events |
+| `POCKETEX_REFRESH_COMMAND` | — | Custom shell command to run instead of the built-in AppleScript refresh |
+| `POCKETEX_CODEX_BUNDLE_ID` | `com.openai.codex` | macOS bundle ID of the Codex app |
 | `CODEX_HOME` | `~/.codex` | Codex data directory (used here for `sessions/` rollout files) |
 
 ```sh
 # Enable desktop refresh explicitly
-REMODEX_REFRESH_ENABLED=true remodex up
+POCKETEX_REFRESH_ENABLED=true pocketex up
 
 # Connect to an existing Codex instance
-REMODEX_CODEX_ENDPOINT=ws://localhost:8080 remodex up
+POCKETEX_CODEX_ENDPOINT=ws://localhost:8080 pocketex up
 
 # Use a custom self-hosted relay endpoint (`ws://` is unencrypted)
-REMODEX_RELAY="ws://localhost:9000/relay" remodex up
+POCKETEX_RELAY="ws://localhost:9000/relay" pocketex up
 
 # Enable managed push only if your self-hosted relay also exposes a configured APNs push service
-REMODEX_RELAY="wss://relay.example/relay" \
-REMODEX_PUSH_SERVICE_URL="https://relay.example" \
-remodex up
+POCKETEX_RELAY="wss://relay.example/relay" \
+POCKETEX_PUSH_SERVICE_URL="https://relay.example" \
+pocketex up
 ```
 
-On the relay/VPS side, keep push disabled until you actually want it. The HTTP push endpoints are off by default and only turn on when you set `REMODEX_ENABLE_PUSH_SERVICE=true`.
+On the relay/VPS side, keep push disabled until you actually want it. The HTTP push endpoints are off by default and only turn on when you set `POCKETEX_ENABLE_PUSH_SERVICE=true`.
 
 ## Pairing and Safety
 
-- Remodex is local-first: Codex, git operations, and workspace actions run on your Mac, while the iPhone acts as a paired remote control.
+- Pocketex is local-first: Codex, git operations, and workspace actions run on your Mac, while the iPhone acts as a paired remote control.
 - On iPhone, the most reliable self-host setup is a Tailscale-reachable relay. Plain LAN pairing over `ws://` on the same Wi-Fi can fail on some iOS devices because local-network routing from the app is not always reliable.
 - The pairing QR carries the connection URL, the session ID, and the bridge identity key used to bootstrap end-to-end encryption. After a successful first scan, the iPhone stores a trusted Mac record in Keychain and the bridge persists its trusted phone identity locally on the Mac.
 - On macOS, the bridge can keep running as a lightweight `launchd` service, so the phone can resolve the Mac's current live relay session and reconnect without scanning a new QR every time.
 - The QR is still the recovery path when trust changes, the bridge identity rotates, or the relay cannot resolve the current live session.
-- The bridge state lives canonically in `~/.remodex/device-state.json` with local-only permissions. On macOS the bridge also mirrors that state to Keychain as best-effort backup/migration data, and recent builds auto-repair unreadable local state on startup instead of requiring manual cleanup.
+- The bridge state lives canonically in `~/.pocketex/device-state.json` with local-only permissions. On macOS the bridge also mirrors that state to Keychain as best-effort backup/migration data, and recent builds auto-repair unreadable local state on startup instead of requiring manual cleanup.
 - The CLI no longer prints the connection URL in plain text below the QR.
-- Set `REMODEX_RELAY` only when you want to self-host or test locally against your own setup.
-- Leave `REMODEX_TRUST_PROXY` unset for direct/self-hosted installs. Turn it on only when a trusted reverse proxy such as Traefik, Nginx, or Caddy is forwarding the relay traffic.
+- Set `POCKETEX_RELAY` only when you want to self-host or test locally against your own setup.
+- Leave `POCKETEX_TRUST_PROXY` unset for direct/self-hosted installs. Turn it on only when a trusted reverse proxy such as Traefik, Nginx, or Caddy is forwarding the relay traffic.
 - The transport implementation is public in [`relay/`](relay/), but your real deployed hostname and credentials should stay private.
 - On the iPhone, the default agent permission mode is `On-Request`. Switching the app to `Full access` auto-approves runtime approval prompts from the agent.
 
 ## Security and Privacy
 
-Remodex now uses an authenticated end-to-end encrypted channel between the paired iPhone and the bridge running on your Mac. The transport layer still carries the WebSocket traffic, but it does not get the plaintext contents of prompts, tool calls, Codex responses, git output, or workspace RPC payloads once the secure session is established.
+Pocketex now uses an authenticated end-to-end encrypted channel between the paired iPhone and the bridge running on your Mac. The transport layer still carries the WebSocket traffic, but it does not get the plaintext contents of prompts, tool calls, Codex responses, git output, or workspace RPC payloads once the secure session is established.
 
 The secure channel is built in these steps:
 
@@ -369,7 +369,7 @@ Privacy notes:
 
 - The transport layer can still see connection metadata and the plaintext secure control messages used to set up the encrypted session, including session IDs, device IDs, public keys, nonces, and handshake result codes.
 - The transport layer does not see decrypted application payloads after the secure handshake succeeds.
-- A fresh QR scan can replace the previously trusted iPhone automatically. Use `remodex reset-pairing` only when you intentionally want to wipe the remembered pairing state yourself.
+- A fresh QR scan can replace the previously trusted iPhone automatically. Use `pocketex reset-pairing` only when you intentionally want to wipe the remembered pairing state yourself.
 - On-device message history is also encrypted at rest on iPhone using a Keychain-backed AES key.
 
 ## Git Integration
@@ -402,7 +402,7 @@ The bridge also handles local workspace-scoped revert operations for the assista
 
 ## Codex Desktop App Integration
 
-Remodex works with both the Codex CLI and the Codex desktop app (`Codex.app`). Under the hood, the bridge spawns a `codex app-server` process — the same JSON-RPC interface that powers the desktop app and IDE extensions. Conversations are persisted as JSONL rollout files under `~/.codex/sessions`, so threads started from your phone show up in the desktop app too.
+Pocketex works with both the Codex CLI and the Codex desktop app (`Codex.app`). Under the hood, the bridge spawns a `codex app-server` process — the same JSON-RPC interface that powers the desktop app and IDE extensions. Conversations are persisted as JSONL rollout files under `~/.codex/sessions`, so threads started from your phone show up in the desktop app too.
 
 What is live today:
 
@@ -415,16 +415,16 @@ What is not fully live today:
 - The desktop app catches up from the persisted session files and can be nudged with the optional refresh workaround below.
 - True phone-to-desktop live sync in the `Codex.app` GUI is not supported today.
 
-To make that limitation more practical, Remodex also includes a hand-off button in the iPhone app. It lets you explicitly continue the current chat on your Mac by opening the matching thread in `Codex.app` when you are ready to switch devices.
+To make that limitation more practical, Pocketex also includes a hand-off button in the iPhone app. It lets you explicitly continue the current chat on your Mac by opening the matching thread in `Codex.app` when you are ready to switch devices.
 
-**Known limitation**: The Codex desktop app does not live-reload when an external `app-server` process writes new data to disk. Threads created or updated from your phone won't appear in the desktop app until it remounts that route. Remodex keeps desktop refresh off by default for now because the current deep-link bounce is still disruptive. You can still enable it manually if you want the old remount workaround.
+**Known limitation**: The Codex desktop app does not live-reload when an external `app-server` process writes new data to disk. Threads created or updated from your phone won't appear in the desktop app until it remounts that route. Pocketex keeps desktop refresh off by default for now because the current deep-link bounce is still disruptive. You can still enable it manually if you want the old remount workaround.
 
 ```sh
 # Enable the old deep-link refresh workaround manually
-REMODEX_REFRESH_ENABLED=true remodex up
+POCKETEX_REFRESH_ENABLED=true pocketex up
 ```
 
-This triggers a debounced deep-link bounce (`codex://settings` → `codex://threads/<id>`) that forces the desktop app to remount the current thread without interrupting any running tasks. While a turn is running, Remodex also watches the persisted rollout for that thread and issues occasional throttled refreshes so long responses become visible on Mac without a full app relaunch. If the local desktop path is unavailable, the bridge self-disables desktop refresh for the rest of that run instead of retrying noisily forever.
+This triggers a debounced deep-link bounce (`codex://settings` → `codex://threads/<id>`) that forces the desktop app to remount the current thread without interrupting any running tasks. While a turn is running, Pocketex also watches the persisted rollout for that thread and issues occasional throttled refreshes so long responses become visible on Mac without a full app relaunch. If the local desktop path is unavailable, the bridge self-disables desktop refresh for the rest of that run instead of retrying noisily forever.
 
 ## Connection Resilience
 
@@ -449,7 +449,7 @@ I'm not actively accepting contributions yet. See [CONTRIBUTING.md](CONTRIBUTING
 ## FAQ
 
 **Do I need an OpenAI API key?**
-Not for Remodex itself. You need Codex CLI set up and working independently.
+Not for Pocketex itself. You need Codex CLI set up and working independently.
 
 **Does this work on Linux/Windows?**
 The core bridge client (Codex forwarding + git) works on any OS. Desktop refresh (AppleScript) is macOS-only, and the built-in daemon / trusted auto-reconnect service path is currently macOS-only too.
@@ -458,22 +458,22 @@ The core bridge client (Codex forwarding + git) works on any OS. Desktop refresh
 On macOS, the bridge can keep running in the background through `launchd`, so closing the terminal does not stop the trusted reconnect path. On other OSes, the foreground bridge stops when the terminal stops.
 
 **How do I force a fresh QR pairing?**
-Run `remodex reset-pairing`, then start the bridge again with `remodex up`. You should only need this when you intentionally want to replace the paired iPhone or wipe the remembered pairing.
+Run `pocketex reset-pairing`, then start the bridge again with `pocketex up`. You should only need this when you intentionally want to replace the paired iPhone or wipe the remembered pairing.
 
 **Can I connect to a remote Codex instance?**
-Yes — set `REMODEX_CODEX_ENDPOINT=ws://host:port` to skip spawning a local `codex app-server`.
+Yes — set `POCKETEX_CODEX_ENDPOINT=ws://host:port` to skip spawning a local `codex app-server`.
 
 **Why don't my phone threads show up in the Codex desktop app immediately?**
-The desktop app reads session data from disk (`~/.codex/sessions`) but doesn't live-reload when an external process writes new data. Your phone still gets the live stream; it is the desktop GUI that lags unless you explicitly enable the refresh workaround with `REMODEX_REFRESH_ENABLED=true`.
+The desktop app reads session data from disk (`~/.codex/sessions`) but doesn't live-reload when an external process writes new data. Your phone still gets the live stream; it is the desktop GUI that lags unless you explicitly enable the refresh workaround with `POCKETEX_REFRESH_ENABLED=true`.
 
-**Does Remodex support true live sync between phone and `Codex.app`?**
+**Does Pocketex support true live sync between phone and `Codex.app`?**
 No. The phone session is live, but the `Codex.app` GUI is not a true live mirror of the active run. To help with that, the iPhone app includes a `Hand off to Mac app` button so you can explicitly continue the same thread on your Mac.
 
 **Can I self-host the relay?**
-Yes. That is the intended forking path. The transport and push-service code are in [`relay/`](relay/); point `REMODEX_RELAY` at the instance you run.
+Yes. That is the intended forking path. The transport and push-service code are in [`relay/`](relay/); point `POCKETEX_RELAY` at the instance you run.
 
 **Can I use Tailscale?**
-Yes. It is the recommended private-network option for self-hosting on iPhone. Run your relay somewhere reachable over Tailscale, set `REMODEX_RELAY` to that relay URL, pair once with QR, then let the app reconnect to the trusted Mac through the same relay.
+Yes. It is the recommended private-network option for self-hosting on iPhone. Run your relay somewhere reachable over Tailscale, set `POCKETEX_RELAY` to that relay URL, pair once with QR, then let the app reconnect to the trusted Mac through the same relay.
 
 **Is the transport layer safe for sensitive work?**
 It is much stronger than a plain text proxy: traffic can be protected in transit with TLS, application payloads are end-to-end encrypted after the secure handshake, and all Codex execution still happens on your Mac. The transport can still observe connection metadata and handshake control messages, so the tightest trust model is to run it yourself.
