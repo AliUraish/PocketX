@@ -42,8 +42,8 @@ struct SidebarThreadRowView: View, Equatable {
         }
         .background {
             if isSelected {
-                DesignTokens.Colors.rowSelected
-                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.row, style: .continuous))
+                Color.clear
+                    .adaptiveGlass(.regular, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.row, style: .continuous))
             }
         }
         .padding(.horizontal, DesignTokens.Spacing.md)
