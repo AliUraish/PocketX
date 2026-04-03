@@ -73,7 +73,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
             // Keep new/empty chats static to avoid scroll indicators and inert scrolling.
             emptyTimelineState
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(.systemBackground))
+                .background(DesignTokens.Colors.chatBackground)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     onTapOutsideComposer()
@@ -109,7 +109,7 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
                     }
                 }
                 .accessibilityIdentifier("turn.timeline.scrollview")
-                .background(Color(.systemBackground))
+                .background(DesignTokens.Colors.chatBackground)
                 .defaultScrollAnchor(.bottom)
                 .scrollDismissesKeyboard(.interactively)
                 .simultaneousGesture(
@@ -565,6 +565,10 @@ struct TurnTimelineView<EmptyState: View, Composer: View>: View {
 
         if autoScrollMode == .anchorAssistantResponse {
             _ = anchorToAssistantResponseIfNeeded(using: proxy)
+        } else if autoScrollMode == .followBottom,
+                  isScrolledToBottom,
+                  visibleMessages.contains(where: { $0.isStreaming }) {
+            scheduleFollowBottomScroll(using: proxy)
         }
     }
 
