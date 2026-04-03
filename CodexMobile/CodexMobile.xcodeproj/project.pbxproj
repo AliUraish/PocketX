@@ -607,7 +607,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "BuildSupport/CodexMobile-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = rimcodex;
+				INFOPLIST_KEY_CFBundleDisplayName = pocketex;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "CodexMobile needs local network access to connect to your Codex app-server running on your Mac.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "CodexMobile needs photo library access to let you attach images to your messages.";
@@ -622,7 +622,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.emanueledipietro.rimcodex;
+				PRODUCT_BUNDLE_IDENTIFIER = com.emanueledipietro.pocketex;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -654,7 +654,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "BuildSupport/CodexMobile-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = rimcodex;
+				INFOPLIST_KEY_CFBundleDisplayName = pocketex;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "CodexMobile needs local network access to connect to your Codex app-server running on your Mac.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "CodexMobile needs photo library access to let you attach images to your messages.";
@@ -669,7 +669,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.emanueledipietro.rimcodex;
+				PRODUCT_BUNDLE_IDENTIFIER = com.emanueledipietro.pocketex;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
