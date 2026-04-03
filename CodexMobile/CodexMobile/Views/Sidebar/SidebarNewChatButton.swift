@@ -40,11 +40,13 @@ struct SidebarNewChatButton: View {
             }
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 16)
-            .contentShape(Rectangle())
+            .padding(.horizontal, DesignTokens.Spacing.lg)
+            .padding(.vertical, DesignTokens.Spacing.sm)
+            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.row, style: .continuous))
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .adaptiveGlass(.regular, in: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.row, style: .continuous))
         .disabled(!isEnabled || isCreatingThread)
         .opacity(isEnabled ? 1 : 0.35)
     }
