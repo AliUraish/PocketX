@@ -15,11 +15,11 @@ struct OnboardingFeaturesPage: View {
                 VStack(spacing: 10) {
                     Text("What you get")
                         .font(AppFont.system(size: 28, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DesignTokens.Colors.glassAccent)
 
                     Text("Everything runs on your Mac.\nYour phone is the remote.")
                         .font(AppFont.subheadline())
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.55))
                         .multilineTextAlignment(.center)
                         .lineSpacing(3)
                 }
@@ -79,11 +79,11 @@ struct OnboardingFeaturesPage: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(AppFont.subheadline(weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(DesignTokens.Colors.glassAccent)
 
                 Text(subtitle)
                     .font(AppFont.caption())
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.5))
                     .lineLimit(2)
             }
 
