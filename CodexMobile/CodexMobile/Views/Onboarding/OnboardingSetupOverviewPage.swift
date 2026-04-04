@@ -78,11 +78,11 @@ struct OnboardingSetupOverviewPage: View {
                     VStack(spacing: 10) {
                         Text("Set Up in 4 Steps")
                             .font(AppFont.system(size: 28, weight: .bold))
-                            .foregroundStyle(DesignTokens.Colors.glassAccent)
+                            .foregroundStyle(.white)
 
                         Text("Everything you need is here on one screen. Run the Mac commands in order, then continue to pair.")
                             .font(AppFont.subheadline())
-                            .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.55))
+                            .foregroundStyle(.white.opacity(0.5))
                             .multilineTextAlignment(.center)
                             .lineSpacing(3)
                     }
@@ -126,12 +126,12 @@ struct OnboardingSetupOverviewPage: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(step.title)
                     .font(AppFont.subheadline(weight: .semibold))
-                    .foregroundStyle(DesignTokens.Colors.glassAccent)
+                    .foregroundStyle(.white)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(step.description)
                     .font(AppFont.caption())
-                    .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.55))
+                    .foregroundStyle(.white.opacity(0.55))
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -141,7 +141,7 @@ struct OnboardingSetupOverviewPage: View {
             if let command = step.command {
                 Text(command)
                     .font(AppFont.mono(.caption2))
-                    .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.82))
+                    .foregroundStyle(.white.opacity(0.82))
                     .lineLimit(3)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
