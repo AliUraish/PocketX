@@ -1,6 +1,8 @@
 // Copy this file to PrivateOverrides.xcconfig and keep the real values local.
 // Xcode will load the private file automatically when it exists.
 
+POCKETEX_DEVELOPMENT_TEAM =
+POCKETEX_APS_ENVIRONMENT =
 POCKETEX_DEFAULT_RELAY_URL =
 POCKETEX_SOURCE_REPOSITORY_URL =
 POCKETEX_PRIVACY_POLICY_URL =
