@@ -1,11 +1,13 @@
 // FILE: SidebarFloatingSettingsButton.swift
 // Purpose: Floating shortcut used to open sidebar settings.
 // Layer: View Component
-// Exports: SidebarFloatingSettingsButton, SidebarMacConnectionStatusView
+// Exports: SidebarFloatingArchiveButton, SidebarFloatingSettingsButton, SidebarMacConnectionStatusView
 
 import SwiftUI
 
-struct SidebarFloatingSettingsButton: View {
+private struct SidebarFloatingIconButton: View {
+    let systemName: String
+    let accessibilityLabel: String
     let action: () -> Void
 
     var body: some View {
@@ -13,7 +15,7 @@ struct SidebarFloatingSettingsButton: View {
             HapticFeedback.shared.triggerImpactFeedback()
             action()
         }) {
-            Image(systemName: "gearshape.fill")
+            Image(systemName: systemName)
                 .font(AppFont.system(size: 17, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(width: 44, height: 44)
@@ -21,7 +23,31 @@ struct SidebarFloatingSettingsButton: View {
         }
         .buttonStyle(.plain)
         .contentShape(Circle())
-        .accessibilityLabel("Settings")
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+struct SidebarFloatingArchiveButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        SidebarFloatingIconButton(
+            systemName: "archivebox.fill",
+            accessibilityLabel: "Archived Chats",
+            action: action
+        )
+    }
+}
+
+struct SidebarFloatingSettingsButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        SidebarFloatingIconButton(
+            systemName: "gearshape.fill",
+            accessibilityLabel: "Settings",
+            action: action
+        )
     }
 }
 
