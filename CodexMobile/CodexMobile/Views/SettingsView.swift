@@ -714,6 +714,8 @@ private struct SettingsGPTAccountCard: View {
     @Environment(CodexService.self) private var codex
     @Environment(\.scenePhase) private var scenePhase
     @State private var isShowingMacLoginInfo = false
+    @State private var isStartingLogin = false
+    @State private var isCancellingLogin = false
 
     var body: some View {
         let snapshot = codex.gptAccountSnapshot
@@ -746,8 +748,23 @@ private struct SettingsGPTAccountCard: View {
                     .foregroundStyle(.red)
             }
 
-            // Keeps the reauth state compact while preserving access to the Mac sign-in explainer.
             if !snapshot.isAuthenticated {
+                SettingsButton(loginButtonTitle(for: snapshot), isLoading: isStartingLogin) {
+                    HapticFeedback.shared.triggerImpactFeedback()
+                    startLoginOnMac()
+                }
+                .disabled(isStartingLogin || isCancellingLogin || !codex.isConnected)
+                .opacity((isStartingLogin || isCancellingLogin || !codex.isConnected) ? 0.6 : 1)
+
+                if snapshot.hasActiveLogin {
+                    SettingsButton("Cancel pending login", role: .cancel, isLoading: isCancellingLogin) {
+                        HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                        cancelPendingLogin()
+                    }
+                    .disabled(isStartingLogin || isCancellingLogin)
+                    .opacity((isStartingLogin || isCancellingLogin) ? 0.6 : 1)
+                }
+
                 HStack {
                     Spacer()
                     Button {
@@ -817,6 +834,38 @@ private struct SettingsGPTAccountCard: View {
         }
     }
 
+    private func loginButtonTitle(for snapshot: CodexGPTAccountSnapshot) -> String {
+        snapshot.hasActiveLogin ? "Resume login on Mac" : "Log in on Mac"
+    }
+
+    private func startLoginOnMac() {
+        guard !isStartingLogin else { return }
+        isStartingLogin = true
+        codex.gptAccountErrorMessage = nil
+
+        Task { @MainActor in
+            defer { isStartingLogin = false }
+
+            do {
+                try await codex.startOrResumeGPTLoginOnMac()
+                await codex.refreshGPTAccountState()
+            } catch {
+                codex.gptAccountErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func cancelPendingLogin() {
+        guard !isCancellingLogin else { return }
+        isCancellingLogin = true
+        codex.gptAccountErrorMessage = nil
+
+        Task { @MainActor in
+            await codex.cancelGPTLogin()
+            await codex.refreshGPTAccountState()
+            isCancellingLogin = false
+        }
+    }
 }
 
 private struct SettingsBridgeVersionCard: View {
