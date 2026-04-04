@@ -216,6 +216,16 @@ enum CodexConnectionPhase: Equatable, Sendable {
     case connected
 }
 
+enum CodexRootResetDestination: Equatable, Sendable {
+    case onboarding
+    case pairing
+}
+
+struct CodexRootResetRequest: Equatable, Sendable {
+    let id = UUID()
+    let destination: CodexRootResetDestination
+}
+
 enum CodexPendingThreadComposerAction: Equatable, Sendable {
     case codeReview(target: CodexPendingCodeReviewTarget)
 }
@@ -413,6 +423,8 @@ final class CodexService {
     var threadCompletionBanner: CodexThreadCompletionBanner?
     // Explains why a push-opened chat could not be restored and offers a recovery path.
     var missingNotificationThreadPrompt: CodexMissingNotificationThreadPrompt?
+    // Lets deeply nested settings actions ask the root shell to reopen onboarding or pairing.
+    var rootResetRequest: CodexRootResetRequest?
 
     // --- Internal wiring ------------------------------------------------------
 
