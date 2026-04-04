@@ -40,7 +40,7 @@ struct PairWithCodeView: View {
                                 Text("Back")
                             }
                             .font(AppFont.body(weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(DesignTokens.Colors.glassAccent)
                         }
                         .buttonStyle(.plain)
                     }
@@ -53,11 +53,11 @@ struct PairWithCodeView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Pair with Code")
                         .font(AppFont.system(size: 30, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(DesignTokens.Colors.glassAccent)
 
                     Text("Enter the relay URL and the short-lived pairing code shown by `pocketex up` on your Mac.")
                         .font(AppFont.subheadline(weight: .regular))
-                        .foregroundStyle(.white.opacity(0.62))
+                        .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.62))
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -98,13 +98,13 @@ struct PairWithCodeView: View {
                         .foregroundStyle(.black)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .background(DesignTokens.Colors.glassAccent, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .buttonStyle(.plain)
 
                 Text("The pairing code is single-use and expires after a few minutes. After pairing once, reconnect uses the trusted device session stored on your iPhone and Mac.")
                     .font(AppFont.caption())
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.45))
                     .fixedSize(horizontal: false, vertical: true)
 
                 Spacer()
@@ -120,10 +120,10 @@ struct PairWithCodeView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(AppFont.caption(weight: .semibold))
-                .foregroundStyle(.white.opacity(0.58))
+                .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.58))
 
             content()
-                .foregroundStyle(.white)
+                .foregroundStyle(DesignTokens.Colors.glassAccent)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
                 .background(
