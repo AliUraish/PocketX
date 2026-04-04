@@ -1,10 +1,8 @@
 <p align="center">
-  <img src="CodexMobile/CodexMobile/Assets.xcassets/pocketex-og1.imageset/pocketex-og2%20%281%29.png" alt="Pocketex" />
+  <img src="CodexMobile/CodexMobile/Assets.xcassets/three.imageset/pocketex_start.png" alt="Pocketex" />
 </p>
 
 # Pocketex
-
-Sync test marker: README updated from the Mac bridge session.
 
 [![npm version](https://img.shields.io/npm/v/pocketex)](https://www.npmjs.com/package/pocketex)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
@@ -34,97 +32,109 @@ The repo stays local-first and self-host friendly: the iOS app source does not e
 
 Today, the background daemon / trusted auto-reconnect flow is implemented for macOS. Self-hosted relay setups still work on other OSes, but they currently use the foreground bridge flow instead of the macOS `launchd` service path.
 
-If you want the public-repo distribution model explained clearly, read [SELF_HOSTING_MODEL.md](SELF_HOSTING_MODEL.md).
-
-> **I am very early in this project. Expect bugs.**
->
-> I am not actively accepting contributions yet. If you still want to help, read [CONTRIBUTING.md](CONTRIBUTING.md) first.
-
 ## Get the App
 
-The app is live on the [App Store](https://apps.apple.com/us/app/pocketex-remote-ai-coding/id6760243963).
+Pocketex is not on the App Store.
 
-Build the iOS app from source in Xcode, install your own signed build on-device, then use the in-app onboarding flow to pair by scanning the QR from `pocketex up`.
+To use it, clone this repository, build the iOS app in Xcode, install it on your iPhone, and run the Mac bridge locally.
+
+Tailscale is required on both your Mac and your iPhone for the supported setup in this repo.
 
 If you scan the pairing QR with a generic camera or QR reader before installing the app, your device may treat the QR payload as plain text and open a web search instead of pairing.
 
 ## Architecture
 
 ```
-┌──────────────┐       Paired session   ┌───────────────┐       stdin/stdout       ┌─────────────┐
-│  Pocketex iOS │ ◄────────────────────► │ pocketex (Mac) │ ◄──────────────────────► │ codex       │
-│  app         │    WebSocket bridge    │ bridge        │    JSON-RPC              │ app-server  │
-└──────────────┘                        └───────────────┘                          └─────────────┘
-                                               │                                         │
-                                               │  AppleScript route bounce                │ JSONL rollout
-                                               ▼                                         ▼
-                                        ┌─────────────┐                           ┌─────────────┐
-                                        │  Codex.app  │ ◄─── reads from ──────── │  ~/.codex/  │
-                                        │  (desktop)  │      disk on navigate     │  sessions   │
-                                        └─────────────┘                           └─────────────┘
+┌──────────────┐       paired session    ┌──────────────┐       paired session    ┌───────────────┐       JSON-RPC        ┌─────────────┐
+│  Pocketex iOS │ ◄────────────────────► │  relay       │ ◄──────────────────────► │ pocketex (Mac) │ ◄──────────────────► │ codex       │
+│  app         │    over Tailscale      │  self-hosted │     over Tailscale       │ bridge        │                      │ app-server  │
+└──────────────┘                        └──────────────┘                          └───────────────┘                      └─────────────┘
+                                                                                         │                                         │
+                                                                                         │  handoff / refresh                       │ JSONL rollout
+                                                                                         ▼                                         ▼
+                                                                                  ┌─────────────┐                           ┌─────────────┐
+                                                                                  │  Codex.app  │ ◄─── reads from ──────── │  ~/.codex/  │
+                                                                                  │  (desktop)  │      disk on navigate     │  sessions   │
+                                                                                  └─────────────┘                           └─────────────┘
 ```
 
-1. Run `pocketex up` on your Mac
-2. On macOS, Pocketex installs/starts a lightweight background bridge service and prints a QR for first-time pairing or recovery
-3. Scan the QR once with the Pocketex iOS app to trust that Mac
-4. After the first handshake, the iPhone can resolve the Mac's live session through the configured relay and reconnect automatically
-5. Your phone sends instructions to Codex through the bridge and receives responses in real-time
-6. The bridge handles git operations and local session persistence on your Mac
+1. Clone this repo and build the iOS app with Xcode
+2. Join the same Tailscale network on both your Mac and your iPhone
+3. Run `./run-local-pocketex.sh` or `pocketex up` on your Mac
+4. The bridge connects to the relay and prints a QR for first-time pairing or recovery
+5. Scan the QR once with the Pocketex iOS app to trust that Mac
+6. Your phone sends instructions to Codex through the relay and bridge and receives responses in real time
 7. `Codex.app` can read the same thread history from disk, but it is not a true live mirror unless you enable the optional refresh workaround
 
 ## Repository Structure
 
-This repo contains the local bridge, the iOS app target, and their tests:
+This repo contains the iOS app, the Mac bridge, the relay, and their supporting files:
 
 ```
-├── phodex-bridge/                # Node.js bridge package used by `pocketex`
-│   ├── bin/                      # CLI entrypoints
-│   └── src/                      # Bridge runtime, git/workspace handlers, refresh helpers
 ├── CodexMobile/                  # Xcode project root
 │   ├── CodexMobile/              # App source target
-│   │   ├── Services/             # Connection, sync, incoming-event, git, and persistence logic
-│   │   ├── Views/                # SwiftUI screens and timeline/sidebar components
+│   │   ├── Assets.xcassets/      # App artwork, screenshots, icons, and assets
 │   │   ├── Models/               # RPC, thread, message, and UI models
-│   │   └── Assets.xcassets/      # App icons and UI assets
+│   │   ├── Resources/            # Embedded resources
+│   │   ├── Services/             # Connection, sync, pairing, git, and persistence logic
+│   │   └── Views/                # SwiftUI screens, onboarding, timeline, and sidebar
 │   ├── CodexMobileTests/         # Unit tests
 │   ├── CodexMobileUITests/       # UI tests
 │   └── BuildSupport/             # Info.plist, xcconfig defaults, and local override templates
+├── phodex-bridge/                # Node.js bridge package used by `pocketex`
+│   ├── bin/                      # CLI entrypoints
+│   ├── scripts/                  # Packaging helpers
+│   ├── src/                      # Bridge runtime, git/workspace handlers, refresh helpers
+│   └── test/                     # Bridge tests
+├── relay/                        # Self-hosted relay and optional push service
+│   ├── server.js                 # HTTP + WebSocket server entrypoint
+│   ├── relay.js                  # Session routing logic
+│   └── push-service.js           # Optional push endpoints
+├── Docs/                         # Extra project docs
+├── SELF_HOSTING_MODEL.md         # Public repo / self-hosting model
+└── run-local-pocketex.sh         # Local launcher for relay + bridge
 ```
 
 ## Prerequisites
 
 - **Node.js** v18+
 - **[Codex CLI](https://github.com/openai/codex)** installed and in your PATH
-- **[Codex desktop app](https://openai.com/index/codex/)** (optional — for viewing threads on your Mac)
-- **A signed Pocketex iOS build** installed on your iPhone or iPad before scanning the pairing QR
-- **macOS** (for desktop refresh features — the core bridge works on any OS)
-- **Xcode 16+** (only if building the iOS app from source)
-
-## Install the Bridge
-
-<sub>Install from npm with `@latest` so you get the newest bridge fixes.</sub>
-
-```sh
-npm install -g pocketex@latest
-```
-
-To update an existing global install later:
-
-```sh
-npm install -g pocketex@latest
-```
-
-If you only want to try Pocketex, you can install it from npm and run it without cloning this repository.
+- **Tailscale** installed and signed in on your Mac
+- **Tailscale** installed and signed in on your iPhone
+- **Xcode 16+**
+- **macOS** for the built-in bridge service and desktop integration
+- **A signed Pocketex iOS build** installed on your iPhone before scanning the pairing QR
 
 ## Quick Start
 
-Install the bridge, then run:
+Clone the repo first:
 
 ```sh
-pocketex up
+git clone https://github.com/AliUraish/PocketX.git
+cd PocketX
 ```
 
-On first connect, open the Pocketex app, follow the onboarding flow, then scan the QR code from inside the app.
+Build and install the iOS app:
+
+```sh
+cd CodexMobile
+open CodexMobile.xcodeproj
+```
+
+In Xcode:
+
+1. Select your Apple Developer team in Signing & Capabilities
+2. Choose your iPhone as the run target
+3. Build and run the app on your iPhone
+
+Back in the repo root, start the local setup:
+
+```sh
+cd /path/to/PocketX
+./run-local-pocketex.sh
+```
+
+On first connect, open the Pocketex app on your iPhone, follow the onboarding flow, then scan the QR code from inside the app.
 
 After that first scan:
 
@@ -138,21 +148,19 @@ For now, the daemon-backed trusted reconnect path is macOS-only. If you self-hos
 ## Run Locally
 
 ```sh
-git clone https://github.com/Emanuele-web04/pocketex.git
-cd pocketex
+git clone https://github.com/AliUraish/PocketX.git
+cd PocketX
 ./run-local-pocketex.sh
 ```
 
-That launcher starts a local relay, points the bridge at `ws://<your-host>:9000/relay`, and prints the pairing QR for the iPhone app.
-
-For iPhone self-hosting, the recommended path is Tailscale or another stable private network. Plain LAN pairing over `ws://<lan-ip>` on the same Wi-Fi is still available for local testing, but it can be unreliable on some iOS devices even when the relay and Wi-Fi are healthy.
+That launcher starts a local relay, points the bridge at your Tailscale-reachable host, and prints the pairing QR for the iPhone app.
 
 Options:
 
-- `./run-local-pocketex.sh --hostname <lan-hostname-or-ip>`
+- `./run-local-pocketex.sh --hostname <tailscale-hostname-or-ip>`
 - `./run-local-pocketex.sh --bind-host 127.0.0.1 --port 9100`
 
-If your iPhone is pairing over LAN, use a hostname or IP the phone can actually reach.
+Tailscale should be active on both devices before you start the launcher.
 
 ## Custom Relay Endpoint
 
@@ -164,15 +172,14 @@ If you want the npm bridge to point at your own setup instead of the package def
 POCKETEX_RELAY="ws://localhost:9000/relay" pocketex up
 ```
 
-For self-hosted iPhone usage, prefer a relay URL reachable over Tailscale or another stable private network. Treat plain local `ws://192.168.x.x` pairing as best-effort rather than the recommended production path on iOS.
-
-A common private setup looks like this:
+For self-hosted iPhone usage in this repo, use a relay URL reachable over Tailscale. A common private setup looks like this:
 
 1. Run the relay on your Mac, a mini server, or a VPS you control
 2. Put that machine on Tailscale
-3. Set `POCKETEX_RELAY` to the Tailscale-reachable `ws://` or `wss://` relay URL
-4. Pair once with QR
-5. Let the iPhone reconnect to the same trusted Mac over that relay later
+3. Put your iPhone on the same Tailscale network
+4. Set `POCKETEX_RELAY` to the Tailscale-reachable `ws://` or `wss://` relay URL
+5. Pair once with QR
+6. Let the iPhone reconnect to the same trusted Mac over that relay later
 
 If that relay is fronting a Mac bridge, the macOS daemon can keep the bridge alive for hands-free reconnects. If you self-host against a non-macOS bridge, the same relay path still works, but automatic background service management is not built in yet.
 
@@ -191,31 +198,6 @@ In that setup, the public endpoints can look like this:
 Have the proxy strip `/pocketex` before forwarding so the relay still receives `/relay/...` and `/v1/push/...`.
 
 If you point `POCKETEX_RELAY` at your own self-hosted relay, managed push stays off unless you also set `POCKETEX_PUSH_SERVICE_URL` on the bridge and explicitly enable push on the relay.
-
-## Publish to npm
-
-Published npm packages can embed default private relay settings at pack time via the `prepack` script.
-
-The current package version is `1.3.4`.
-
-To publish the bridge with `api.phodex.app` as the default relay:
-
-```sh
-cd phodex-bridge
-npm login
-POCKETEX_PACKAGE_DEFAULT_RELAY_URL="wss://api.phodex.app/relay" \
-npm publish
-```
-
-After publish, users can still override the packaged default at runtime with `POCKETEX_RELAY`.
-
-You can also run the bridge from source:
-
-```sh
-cd phodex-bridge
-npm install
-POCKETEX_RELAY="ws://localhost:9000/relay" npm start
-```
 
 ## Commands
 
@@ -239,6 +221,10 @@ In both cases the bridge:
 - Forwards JSON-RPC messages bidirectionally
 - Handles git commands from the phone
 - Persists the active thread for later resumption
+
+### `pocketex run`
+
+Runs the bridge directly in the foreground without the macOS service wrapper.
 
 ### `pocketex start`
 
@@ -267,7 +253,6 @@ Prints the installed Pocketex CLI version.
 
 ```sh
 pocketex --version
-# => 1.3.4
 ```
 
 ### `pocketex reset-pairing`
@@ -341,7 +326,8 @@ On the relay/VPS side, keep push disabled until you actually want it. The HTTP p
 ## Pairing and Safety
 
 - Pocketex is local-first: Codex, git operations, and workspace actions run on your Mac, while the iPhone acts as a paired remote control.
-- On iPhone, the most reliable self-host setup is a Tailscale-reachable relay. Plain LAN pairing over `ws://` on the same Wi-Fi can fail on some iOS devices because local-network routing from the app is not always reliable.
+- Tailscale should be active on both the Mac and the iPhone for the supported setup in this repo.
+- On iPhone, use a Tailscale-reachable relay instead of relying on plain LAN routing.
 - The pairing QR carries the connection URL, the session ID, and the bridge identity key used to bootstrap end-to-end encryption. After a successful first scan, the iPhone stores a trusted Mac record in Keychain and the bridge persists its trusted phone identity locally on the Mac.
 - On macOS, the bridge can keep running as a lightweight `launchd` service, so the phone can resolve the Mac's current live relay session and reconnect without scanning a new QR every time.
 - The QR is still the recovery path when trust changes, the bridge identity rotates, or the relay cannot resolve the current live session.
@@ -444,7 +430,11 @@ Build and run on a physical device or simulator with Xcode. The app uses SwiftUI
 
 ## Contributing
 
-I'm not actively accepting contributions yet. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Contributions are most welcome.
+
+If you want to help make Pocketex better, open an issue, send a PR, and please star the repo:
+
+[https://github.com/AliUraish/PocketX](https://github.com/AliUraish/PocketX)
 
 ## FAQ
 
@@ -473,7 +463,7 @@ No. The phone session is live, but the `Codex.app` GUI is not a true live mirror
 Yes. That is the intended forking path. The transport and push-service code are in [`relay/`](relay/); point `POCKETEX_RELAY` at the instance you run.
 
 **Can I use Tailscale?**
-Yes. It is the recommended private-network option for self-hosting on iPhone. Run your relay somewhere reachable over Tailscale, set `POCKETEX_RELAY` to that relay URL, pair once with QR, then let the app reconnect to the trusted Mac through the same relay.
+Yes. In this repo's supported setup, Tailscale should be installed and active on both your Mac and your iPhone. Run your relay somewhere reachable over Tailscale, set `POCKETEX_RELAY` to that relay URL, pair once with QR, then let the app reconnect to the trusted Mac through the same relay.
 
 **Is the transport layer safe for sensitive work?**
 It is much stronger than a plain text proxy: traffic can be protected in transit with TLS, application payloads are end-to-end encrypted after the secure handshake, and all Codex execution still happens on your Mac. The transport can still observe connection metadata and handshake control messages, so the tightest trust model is to run it yourself.
