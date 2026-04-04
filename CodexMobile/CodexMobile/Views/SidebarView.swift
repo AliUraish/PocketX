@@ -10,6 +10,7 @@ struct SidebarView: View {
     @Environment(CodexService.self) private var codex
 
     @Binding var selectedThread: CodexThread?
+    @Binding var showArchivedChats: Bool
     @Binding var showSettings: Bool
     @Binding var isSearchActive: Bool
 
@@ -36,7 +37,7 @@ struct SidebarView: View {
         let diffTotalsByThreadID = cachedDiffTotals
 
         VStack(alignment: .leading, spacing: 0) {
-            SidebarHeaderView()
+            SidebarHeaderView(onOpenArchive: openArchivedChats)
 
             SidebarSearchField(text: $searchText, isActive: $isSearchActive)
                 .padding(.horizontal, DesignTokens.Spacing.lg)
@@ -267,6 +268,13 @@ struct SidebarView: View {
         searchText = ""
         debouncedSearchText = ""
         showSettings = true
+        onClose()
+    }
+
+    private func openArchivedChats() {
+        searchText = ""
+        debouncedSearchText = ""
+        showArchivedChats = true
         onClose()
     }
 
