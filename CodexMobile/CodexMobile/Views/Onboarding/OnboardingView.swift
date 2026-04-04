@@ -2,7 +2,7 @@
 // Purpose: Split onboarding flow — swipeable pages with fixed bottom bar.
 // Layer: View
 // Exports: OnboardingView
-// Depends on: SwiftUI, OnboardingWelcomePage, OnboardingFeaturesPage, OnboardingStepPage
+// Depends on: SwiftUI, OnboardingWelcomePage, OnboardingFeaturesPage, OnboardingSetupOverviewPage
 
 import SwiftUI
 
@@ -11,7 +11,7 @@ struct OnboardingView: View {
     @State private var currentPage = 0
     @State private var isShowingCodexInstallReminder = false
 
-    private let pageCount = 5
+    private let pageCount = 3
     private let codexInstallStepIndex = 2
     private let codexInstallCommand = "npm install -g @openai/codex@latest"
 
@@ -27,32 +27,8 @@ struct OnboardingView: View {
                     OnboardingFeaturesPage()
                         .tag(1)
 
-                    OnboardingStepPage(
-                        stepNumber: 1,
-                        icon: "terminal",
-                        title: "Install Codex CLI",
-                        description: "The AI coding agent that lives in your terminal. pocketex connects to it from your iPhone.",
-                        command: codexInstallCommand
-                    )
-                    .tag(2)
-
-                    OnboardingStepPage(
-                        stepNumber: 2,
-                        icon: "link",
-                        title: "Install the Bridge",
-                        description: "A lightweight relay that securely connects your Mac to your iPhone.",
-                        command: "npm install -g pocketex@latest"
-                    )
-                    .tag(3)
-
-                    OnboardingStepPage(
-                        stepNumber: 3,
-                        icon: "number.square",
-                        title: "Start Pairing",
-                        description: "Run this on your Mac. A short pairing code will appear in your terminal. Enter that code on your iPhone next.",
-                        command: "pocketex up"
-                    )
-                    .tag(4)
+                    OnboardingSetupOverviewPage()
+                        .tag(2)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -63,7 +39,7 @@ struct OnboardingView: View {
         .alert("Install Codex CLI First", isPresented: $isShowingCodexInstallReminder) {
             Button("Stay Here", role: .cancel) {}
             Button("Continue Anyway") {
-                advanceToNextPage()
+                finishCurrentPage()
             }
         } message: {
             Text("Copy and paste \"\(codexInstallCommand)\" on your Mac before moving on. pocketex will not work until Codex CLI is installed and available in your PATH.")
@@ -78,7 +54,7 @@ struct OnboardingView: View {
             HStack(spacing: 8) {
                 ForEach(0..<pageCount, id: \.self) { i in
                     Capsule()
-                        .fill(i == currentPage ? Color.white : Color.white.opacity(0.18))
+                        .fill(i == currentPage ? DesignTokens.Colors.glassAccent : Color.white.opacity(0.18))
                         .frame(width: i == currentPage ? 24 : 8, height: 8)
                 }
             }
@@ -95,14 +71,19 @@ struct OnboardingView: View {
                     Text(buttonTitle)
                         .font(AppFont.body(weight: .semibold))
                 }
-                .foregroundStyle(.black)
+                .foregroundStyle(DesignTokens.Colors.glassAccent)
                 .frame(maxWidth: .infinity)
                 .frame(height: 56)
-                .background(.white, in: Capsule())
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(DesignTokens.Colors.glassAccent.opacity(0.16))
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(DesignTokens.Colors.glassAccent.opacity(0.36), lineWidth: 1)
+                )
             }
             .buttonStyle(.plain)
-
-            OpenSourceBadge(style: .light)
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 12)
@@ -123,7 +104,7 @@ struct OnboardingView: View {
     private var buttonTitle: String {
         switch currentPage {
         case 0: return "Get Started"
-        case 1: return "Set Up"
+        case 1: return "Continue"
         case pageCount - 1: return "Pair with Code"
         default: return "Continue"
         }
@@ -136,6 +117,10 @@ struct OnboardingView: View {
             return
         }
 
+        finishCurrentPage()
+    }
+
+    private func finishCurrentPage() {
         if currentPage < pageCount - 1 {
             advanceToNextPage()
         } else {
