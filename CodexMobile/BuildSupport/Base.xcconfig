@@ -1,6 +1,8 @@
 // Shared public defaults for open-source builds.
 // Real private endpoints belong in the ignored PrivateOverrides.xcconfig file.
 
+POCKETEX_DEVELOPMENT_TEAM =
+POCKETEX_APS_ENVIRONMENT =
 PHODEX_CHATGPT_CALLBACK_SCHEME = pocketex
 POCKETEX_DEFAULT_RELAY_URL =
 POCKETEX_SOURCE_REPOSITORY_URL =
