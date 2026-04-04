@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var sidebarDragOffset: CGFloat = 0
     @State private var selectedThread: CodexThread?
     @State private var navigationPath = NavigationPath()
+    @State private var showArchivedChats = false
     @State private var showSettings = false
     @State private var isShowingManualScanner = false
     @State private var hasDismissedAutomaticScanner = false
@@ -45,6 +46,12 @@ struct ContentView: View {
                 if show {
                     navigationPath.append("settings")
                     showSettings = false
+                }
+            }
+            .onChange(of: showArchivedChats) { _, show in
+                if show {
+                    navigationPath.append("archivedChats")
+                    showArchivedChats = false
                 }
             }
             .onChange(of: isSidebarOpen) { wasOpen, isOpen in
@@ -77,6 +84,12 @@ struct ContentView: View {
                     return
                 }
                 selectedThread = matchingThread
+            }
+            .onChange(of: codex.rootResetRequest?.id) { _, _ in
+                guard let request = codex.rootResetRequest else {
+                    return
+                }
+                handleRootResetRequest(request)
             }
             .onChange(of: codex.threads) { _, threads in
                 syncSelectedThread(with: threads)
@@ -230,6 +243,7 @@ struct ContentView: View {
             if sidebarVisible {
                 SidebarView(
                     selectedThread: $selectedThread,
+                    showArchivedChats: $showArchivedChats,
                     showSettings: $showSettings,
                     isSearchActive: $isSearchActive,
                     onClose: { closeSidebar() }
@@ -262,6 +276,9 @@ struct ContentView: View {
                 .navigationDestination(for: String.self) { destination in
                     if destination == "settings" {
                         SettingsView()
+                            .adaptiveNavigationBar()
+                    } else if destination == "archivedChats" {
+                        ArchivedChatsView()
                             .adaptiveNavigationBar()
                     }
                 }
@@ -597,6 +614,41 @@ struct ContentView: View {
             scannerCanReturnToOnboarding = false
             hasSeenOnboarding = false
         }
+    }
+
+    private func handleRootResetRequest(_ request: CodexRootResetRequest) {
+        codex.shouldAutoReconnectOnForeground = false
+        codex.connectionRecoveryState = .idle
+        codex.lastErrorMessage = nil
+        codex.bridgeUpdatePrompt = nil
+        codex.threadCompletionBanner = nil
+        codex.missingNotificationThreadPrompt = nil
+
+        withAnimation {
+            selectedThread = nil
+            navigationPath = NavigationPath()
+            isSidebarOpen = false
+            sidebarDragOffset = 0
+            showSettings = false
+            isSearchActive = false
+            isPreparingManualScanner = false
+            isRetryingBridgeUpdate = false
+
+            switch request.destination {
+            case .onboarding:
+                isShowingManualScanner = false
+                hasDismissedAutomaticScanner = false
+                scannerCanReturnToOnboarding = false
+                hasSeenOnboarding = false
+            case .pairing:
+                hasSeenOnboarding = true
+                isShowingManualScanner = true
+                hasDismissedAutomaticScanner = false
+                scannerCanReturnToOnboarding = false
+            }
+        }
+
+        codex.rootResetRequest = nil
     }
 
     private func startNewThreadFromMissingNotificationAlert() async {
