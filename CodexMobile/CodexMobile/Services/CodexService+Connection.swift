@@ -249,6 +249,114 @@ extension CodexService {
         clearSavedRelaySession()
     }
 
+    func clearAllTrustedMacs() {
+        trustedMacRegistry.records.removeAll()
+        SecureStore.writeCodable(trustedMacRegistry, for: CodexSecureKeys.trustedMacRegistry)
+        SecureStore.deleteValue(for: CodexSecureKeys.lastTrustedMacDeviceId)
+        lastTrustedMacDeviceId = nil
+        clearSavedRelaySession()
+        resetSecureTransportState()
+        secureConnectionState = .notPaired
+        secureMacFingerprint = nil
+    }
+
+    // Clears phone-side chat/session state so logout/disconnect never leave stale conversations visible.
+    func resetLocalConversationState() {
+        stopSyncLoop()
+        postConnectSyncTask?.cancel()
+        postConnectSyncTask = nil
+        gptAccountLoginSyncTask?.cancel()
+        gptAccountLoginSyncTask = nil
+        messagePersistenceDebounceTask?.cancel()
+        messagePersistenceDebounceTask = nil
+        coalescedRevertRefreshTask?.cancel()
+        coalescedRevertRefreshTask = nil
+
+        clearPendingApprovals()
+        clearTransientConnectionPrompts()
+        clearRememberedLastOpenedThreadID()
+        clearPersistedThreadVisibilityState()
+
+        threads = []
+        currentOutput = ""
+        activeThreadId = nil
+        activeTurnId = nil
+        activeTurnIdByThread.removeAll()
+        latestTurnTerminalStateByThread.removeAll()
+        terminalStateByTurnID.removeAll()
+        pendingComposerActionByThreadID.removeAll()
+        queuedTurnDraftsByThread.removeAll()
+        queuePauseStateByThread.removeAll()
+        messagesByThread = [:]
+        messageRevisionByThread.removeAll()
+        availableModels = []
+        isLoadingModels = false
+        modelsErrorMessage = nil
+        pendingNotificationOpenThreadID = nil
+        bridgeHealthSnapshot = nil
+        bridgeDiagnosticEvents = []
+        threadCompletionBanner = nil
+        missingNotificationThreadPrompt = nil
+        lastRawMessage = nil
+        lastErrorMessage = nil
+        connectionRecoveryState = .idle
+        commandExecutionDetailsByItemID.removeAll()
+        contextWindowUsageByThread.removeAll()
+        rateLimitBuckets = []
+        hasResolvedRateLimitsSnapshot = false
+        isLoadingRateLimits = false
+        rateLimitsErrorMessage = nil
+        threadRuntimeOverridesByThreadID = [:]
+        defaults.removeObject(forKey: Self.threadRuntimeOverridesDefaultsKey)
+        forkedFromThreadIDByThreadID = [:]
+        defaults.removeObject(forKey: Self.forkedThreadOriginsDefaultsKey)
+        renamedThreadNameByThreadID = [:]
+        defaults.removeObject(forKey: Self.renamedThreadNamesDefaultsKey)
+        aiChangeSetsByID.removeAll()
+        aiChangeSetIDByTurnID.removeAll()
+        aiChangeSetIDByAssistantMessageID.removeAll()
+        assistantCompletionFingerprintByThread.removeAll()
+        recentActivityLineByThread.removeAll()
+        repoRootByWorkingDirectory.removeAll()
+        knownRepoRoots.removeAll()
+        busyRepoRoots.removeAll()
+        subagentIdentityByThreadID.removeAll()
+        subagentIdentityByAgentID.removeAll()
+        subagentIdentityVersion += 1
+
+        removeAllThreadTimelineState()
+        clearAllRunningState()
+        readyThreadIDs.removeAll()
+        failedThreadIDs.removeAll()
+        runningThreadWatchByID.removeAll()
+        clearHydrationCaches()
+        threadIdByTurnID.removeAll()
+        streamingAssistantMessageByTurnID.removeAll()
+        streamingSystemMessageByItemID.removeAll()
+
+        messagePersistence.save([:])
+    }
+
+    func requestRootReset(_ destination: CodexRootResetDestination) {
+        rootResetRequest = CodexRootResetRequest(destination: destination)
+    }
+
+    func disconnectAndResetToPairing() async {
+        await disconnect()
+        clearSavedRelaySession()
+        resetLocalConversationState()
+        requestRootReset(.pairing)
+    }
+
+    func resetToFullStart() async {
+        await disconnect()
+        clearAllTrustedMacs()
+        resetLocalConversationState()
+        gptAccountSnapshot = .initialSnapshot()
+        gptAccountErrorMessage = nil
+        requestRootReset(.onboarding)
+    }
+
     func initializeSession() async throws {
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
         let clientInfo: JSONValue = .object([
