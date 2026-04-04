@@ -54,7 +54,7 @@ struct OnboardingView: View {
             HStack(spacing: 8) {
                 ForEach(0..<pageCount, id: \.self) { i in
                     Capsule()
-                        .fill(i == currentPage ? DesignTokens.Colors.glassAccent : Color.white.opacity(0.18))
+                        .fill(i == currentPage ? Color.white : Color.white.opacity(0.18))
                         .frame(width: i == currentPage ? 24 : 8, height: 8)
                 }
             }
