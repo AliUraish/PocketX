@@ -11,6 +11,7 @@ struct SettingsView: View {
 
     @AppStorage("codex.appFontStyle") private var appFontStyleRawValue = AppFont.defaultStoredStyleRawValue
     @State private var isShowingMacNameSheet = false
+    @State private var isLoggingOut = false
 
     private let runtimeAutoValue = "__AUTO__"
     private let runtimeNormalValue = "__NORMAL__"
@@ -19,7 +20,6 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                SettingsArchivedChatsCard()
                 SettingsAppearanceCard(appFontStyle: appFontStyleBinding)
                 SettingsNotificationsCard()
                 SettingsGPTAccountCard()
@@ -200,6 +200,13 @@ struct SettingsView: View {
                     codex.forgetTrustedMac()
                 }
             }
+
+            Divider()
+
+            SettingsButton("Log out", role: .destructive, isLoading: isLoggingOut) {
+                HapticFeedback.shared.triggerImpactFeedback()
+                logout()
+            }
         }
     }
 
@@ -371,8 +378,19 @@ struct SettingsView: View {
 
     private func disconnectRelay() {
         Task { @MainActor in
-            await codex.disconnect()
-            codex.clearSavedRelaySession()
+            await codex.disconnectAndResetToPairing()
+        }
+    }
+
+    private func logout() {
+        guard !isLoggingOut else { return }
+        isLoggingOut = true
+        codex.gptAccountErrorMessage = nil
+
+        Task { @MainActor in
+            await codex.logoutGPTAccount()
+            await codex.resetToFullStart()
+            isLoggingOut = false
         }
     }
 
@@ -695,7 +713,6 @@ private struct SettingsNotificationsCard: View {
 private struct SettingsGPTAccountCard: View {
     @Environment(CodexService.self) private var codex
     @Environment(\.scenePhase) private var scenePhase
-    @State private var isLoggingOut = false
     @State private var isShowingMacLoginInfo = false
 
     var body: some View {
@@ -747,12 +764,6 @@ private struct SettingsGPTAccountCard: View {
                 }
             }
 
-            if snapshot.canLogout {
-                SettingsButton("Log out", role: .destructive, isLoading: isLoggingOut) {
-                    HapticFeedback.shared.triggerImpactFeedback()
-                    logout()
-                }
-            }
         }
         .task {
             await codex.refreshGPTAccountState()
@@ -806,17 +817,6 @@ private struct SettingsGPTAccountCard: View {
         }
     }
 
-    private func logout() {
-        guard !isLoggingOut else { return }
-        isLoggingOut = true
-        codex.gptAccountErrorMessage = nil
-
-        Task { @MainActor in
-            await codex.logoutGPTAccount()
-            await codex.refreshGPTAccountState()
-            isLoggingOut = false
-        }
-    }
 }
 
 private struct SettingsBridgeVersionCard: View {
@@ -966,38 +966,6 @@ private struct SettingsBridgeVersionCard: View {
                 .foregroundStyle(valueStyle)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
-        }
-    }
-}
-
-private struct SettingsArchivedChatsCard: View {
-    @Environment(CodexService.self) private var codex
-
-    private var archivedCount: Int {
-        codex.threads.filter { $0.syncState == .archivedLocal }.count
-    }
-
-    var body: some View {
-        SettingsCard(title: "Archived Chats") {
-            NavigationLink {
-                ArchivedChatsView()
-            } label: {
-                HStack {
-                    Label("Archived Chats", systemImage: "archivebox")
-                        .font(AppFont.subheadline(weight: .medium))
-                        .foregroundStyle(DesignTokens.Colors.glassAccent)
-                    Spacer()
-                    if archivedCount > 0 {
-                        Text("\(archivedCount)")
-                            .font(AppFont.caption(weight: .medium))
-                            .foregroundStyle(DesignTokens.Colors.glassAccent)
-                    }
-                    Image(systemName: "chevron.right")
-                        .font(AppFont.caption(weight: .semibold))
-                        .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.75))
-                }
-            }
-            .buttonStyle(.plain)
         }
     }
 }
