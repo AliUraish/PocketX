@@ -741,4 +741,9 @@ extension CodexService {
         ids.insert(threadId)
         defaults.set(Array(ids), forKey: Self.locallyDeletedThreadIDsKey)
     }
+
+    func clearPersistedThreadVisibilityState() {
+        defaults.removeObject(forKey: Self.locallyArchivedThreadIDsKey)
+        defaults.removeObject(forKey: Self.locallyDeletedThreadIDsKey)
+    }
 }
