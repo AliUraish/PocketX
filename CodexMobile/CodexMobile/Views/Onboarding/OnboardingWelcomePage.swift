@@ -10,7 +10,6 @@ struct OnboardingWelcomePage: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .top) {
-                // Base black
                 Color.black.ignoresSafeArea()
 
                 // Hero image — full screen, fills top to bottom
@@ -70,12 +69,12 @@ struct OnboardingWelcomePage: View {
                         VStack(spacing: 10) {
                             Text("PocketX")
                                 .font(AppFont.system(size: 34, weight: .bold))
-                                .foregroundStyle(DesignTokens.Colors.glassAccent)
+                                .foregroundStyle(.white)
                                 .multilineTextAlignment(.center)
 
                             Text("Control Codex from your iPhone.")
                                 .font(AppFont.subheadline(weight: .regular))
-                                .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.6))
+                                .foregroundStyle(.white.opacity(0.58))
                                 .multilineTextAlignment(.center)
                         }
 
@@ -85,7 +84,7 @@ struct OnboardingWelcomePage: View {
                             Text("End-to-end encrypted")
                                 .font(AppFont.caption(weight: .medium))
                         }
-                        .foregroundStyle(DesignTokens.Colors.glassAccent.opacity(0.5))
+                        .foregroundStyle(.white.opacity(0.5))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, 28)
