@@ -11,6 +11,7 @@ struct OpenSourceBadge: View {
     enum BadgeStyle {
         case light
         case dark
+        case accent
     }
 
     var body: some View {
@@ -29,6 +30,7 @@ struct OpenSourceBadge: View {
     private var badgeLabel: some View {
         HStack(spacing: 6) {
             Image("github-mark-white")
+                .renderingMode(.template)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 14, height: 14)
@@ -53,6 +55,7 @@ struct OpenSourceBadge: View {
         switch style {
         case .light: .white.opacity(0.5)
         case .dark: .secondary
+        case .accent: DesignTokens.Colors.glassAccent
         }
     }
 
@@ -60,6 +63,7 @@ struct OpenSourceBadge: View {
         switch style {
         case .light: .white.opacity(0.06)
         case .dark: Color(.tertiarySystemFill).opacity(0.5)
+        case .accent: DesignTokens.Colors.glassAccent.opacity(0.14)
         }
     }
 
@@ -67,6 +71,7 @@ struct OpenSourceBadge: View {
         switch style {
         case .light: .white.opacity(0.08)
         case .dark: Color.primary.opacity(0.06)
+        case .accent: DesignTokens.Colors.glassAccent.opacity(0.34)
         }
     }
 }
@@ -82,4 +87,12 @@ struct OpenSourceBadge: View {
 #Preview("Dark (light bg)") {
     OpenSourceBadge(style: .dark)
         .padding()
+}
+
+#Preview("Accent") {
+    ZStack {
+        Color.black.ignoresSafeArea()
+        OpenSourceBadge(style: .accent)
+    }
+    .preferredColorScheme(.dark)
 }
