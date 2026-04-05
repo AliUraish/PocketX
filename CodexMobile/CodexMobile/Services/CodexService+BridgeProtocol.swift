@@ -353,6 +353,13 @@ extension CodexService {
         ) {
             supportsBridgeVoiceAuth = voiceAuthSupport
         }
+
+        if let terminalSessionSupport = firstBoolValue(
+            in: runtimeCapabilities,
+            keys: ["terminalSessions", "terminal_sessions"]
+        ) {
+            supportsBridgeTerminalSessions = terminalSessionSupport
+        }
     }
 
     func shouldTreatAsUnsupportedBridgeProtocol(_ error: Error) -> Bool {
