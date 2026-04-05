@@ -380,6 +380,8 @@ final class CodexService {
     var supportsServiceTier = true
     // Runtime compatibility flag for the bridge-owned `voice/resolveAuth` voice flow.
     var supportsBridgeVoiceAuth = true
+    // Runtime compatibility flag for bridge-owned local terminal sessions.
+    var supportsBridgeTerminalSessions = true
     // Runtime compatibility flag for native `thread/fork` conversation branching.
     var supportsThreadFork = true
     // Bridge protocol negotiation state for the bridge-owned mobile API facade.
@@ -516,6 +518,7 @@ final class CodexService {
     // Canonical repo roots keyed by observed working directories from bridge git/status responses.
     var repoRootByWorkingDirectory: [String: String] = [:]
     var knownRepoRoots: Set<String> = []
+    var terminalSessionStateByThreadID: [String: CodexTerminalSessionState] = [:]
     // Service-owned per-thread UI state keeps the active chat isolated from unrelated thread mutations.
     @ObservationIgnored var threadTimelineStateByThread: [String: ThreadTimelineState] = [:]
     @ObservationIgnored var forkedFromThreadIDByThreadID: [String: String] = [:]
