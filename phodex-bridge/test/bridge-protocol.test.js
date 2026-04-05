@@ -56,6 +56,10 @@ test("buildBridgeCapabilities reports bridge protocol envelopes and versions", (
           threadFork: true,
         },
       },
+      terminalCapabilitySnapshot: {
+        terminalSessions: true,
+        terminalRevealOnMac: true,
+      },
     }),
     {
       bridgeManaged: true,
@@ -83,6 +87,7 @@ test("buildBridgeCapabilities reports bridge protocol envelopes and versions", (
         "terminal/open",
         "terminal/write",
         "terminal/close",
+        "terminal/revealOnMac",
       ],
       features: {
         threadHistory: true,
@@ -95,6 +100,7 @@ test("buildBridgeCapabilities reports bridge protocol envelopes and versions", (
         accountStatusRead: true,
         voiceResolveAuth: true,
         terminalSessions: true,
+        terminalRevealOnMac: true,
       },
       bridgeVersion: "1.2.3",
       bridgeLatestVersion: "1.2.9",
@@ -106,6 +112,7 @@ test("buildBridgeCapabilities reports bridge protocol envelopes and versions", (
         accountStatusRead: true,
         voiceResolveAuth: true,
         terminalSessions: true,
+        terminalRevealOnMac: true,
       },
       runtimeCapabilityProbeAt: 123456,
     }
