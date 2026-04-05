@@ -735,6 +735,7 @@ function startBridge({
             result: buildBridgeCapabilities({
               packageVersionStatus,
               runtimeCapabilitySnapshot,
+              terminalCapabilitySnapshot: terminalHandler.getCapabilitySnapshot(),
             }),
           }));
         })
