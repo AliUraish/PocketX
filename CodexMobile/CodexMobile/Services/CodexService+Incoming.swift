@@ -212,6 +212,12 @@ extension CodexService {
                 }
             }
 
+        case "terminal/output":
+            handleTerminalOutputNotification(paramsObject)
+
+        case "terminal/closed":
+            handleTerminalClosedNotification(paramsObject)
+
         case "thread/started":
             handleThreadStarted(paramsObject)
 
