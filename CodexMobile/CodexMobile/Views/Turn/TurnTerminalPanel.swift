@@ -21,6 +21,7 @@ struct TurnTerminalPanel: View {
     @State private var isOpeningSession = false
     @State private var isSendingInput = false
     @State private var isClosingSession = false
+    @State private var isRevealingOnMac = false
     @FocusState private var isInputFocused: Bool
 
     private var terminalState: CodexTerminalSessionState {
@@ -330,6 +331,28 @@ struct TurnTerminalPanel: View {
             }
 
             HStack(spacing: 10) {
+                if codex.supportsBridgeTerminalRevealOnMac {
+                    Button(action: revealOnMac) {
+                        ZStack {
+                            if isRevealingOnMac {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(.black)
+                            } else {
+                                Text("Reveal on Mac")
+                                    .font(AppFont.body(weight: .semibold))
+                                    .foregroundStyle(.black)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isRevealingOnMac || isClosingSession)
+                    .opacity((isRevealingOnMac || isClosingSession) ? 0.7 : 1)
+                }
+
                 Button(action: restartTerminalSession) {
                     Text("Restart")
                         .font(AppFont.body(weight: .medium))
@@ -339,7 +362,7 @@ struct TurnTerminalPanel: View {
                         .adaptiveGlass(.regular, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .disabled(isOpeningSession || isClosingSession)
+                .disabled(isOpeningSession || isClosingSession || isRevealingOnMac)
 
                 Button(action: endTerminalSession) {
                     ZStack {
@@ -358,8 +381,8 @@ struct TurnTerminalPanel: View {
                     .background(Color.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .disabled(isClosingSession)
-                .opacity(isClosingSession ? 0.7 : 1)
+                .disabled(isClosingSession || isRevealingOnMac)
+                .opacity((isClosingSession || isRevealingOnMac) ? 0.7 : 1)
             }
 
             if let errorMessage = localErrorMessage ?? terminalState.errorMessage {
@@ -483,14 +506,27 @@ struct TurnTerminalPanel: View {
         }
     }
 
-    private func dismissPanel() {
+    private func revealOnMac() {
+        localErrorMessage = nil
+        isRevealingOnMac = true
+
         Task {
-            await codex.closeTerminalSession(forThreadID: threadID)
-            await MainActor.run {
-                codex.discardTerminalSessionState(forThreadID: threadID)
-                onDismiss()
+            do {
+                try await codex.revealTerminalSessionOnMac(forThreadID: threadID)
+                await MainActor.run {
+                    isRevealingOnMac = false
+                }
+            } catch {
+                await MainActor.run {
+                    localErrorMessage = error.localizedDescription
+                    isRevealingOnMac = false
+                }
             }
         }
+    }
+
+    private func dismissPanel() {
+        onDismiss()
     }
 
     private func scrollTerminalToBottom(_ proxy: ScrollViewProxy) {
