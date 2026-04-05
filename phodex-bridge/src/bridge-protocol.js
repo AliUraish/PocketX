@@ -66,7 +66,10 @@ function mapBridgeProtocolMethodToCodexMethod(method) {
 function buildBridgeCapabilities({
   packageVersionStatus = null,
   runtimeCapabilitySnapshot = null,
+  terminalCapabilitySnapshot = null,
 } = {}) {
+  const supportsTerminalSessions = readBoolean(terminalCapabilitySnapshot?.terminalSessions) !== false;
+  const supportsTerminalRevealOnMac = Boolean(readBoolean(terminalCapabilitySnapshot?.terminalRevealOnMac));
   return {
     bridgeManaged: true,
     bridgeProtocolVersion: BRIDGE_PROTOCOL_VERSION,
@@ -83,6 +86,7 @@ function buildBridgeCapabilities({
       "terminal/open",
       "terminal/write",
       "terminal/close",
+      "terminal/revealOnMac",
     ]),
     features: {
       threadHistory: true,
@@ -94,7 +98,8 @@ function buildBridgeCapabilities({
       bridgeCapabilities: true,
       accountStatusRead: true,
       voiceResolveAuth: true,
-      terminalSessions: true,
+      terminalSessions: supportsTerminalSessions,
+      terminalRevealOnMac: supportsTerminalRevealOnMac,
     },
     bridgeVersion: readString(packageVersionStatus?.bridgeVersion) || null,
     bridgeLatestVersion: readString(packageVersionStatus?.bridgeLatestVersion) || null,
@@ -105,7 +110,8 @@ function buildBridgeCapabilities({
       threadFork: readBoolean(runtimeCapabilitySnapshot?.capabilities?.threadFork),
       accountStatusRead: true,
       voiceResolveAuth: true,
-      terminalSessions: true,
+      terminalSessions: supportsTerminalSessions,
+      terminalRevealOnMac: supportsTerminalRevealOnMac,
     }),
     runtimeCapabilityProbeAt: clampPositiveInteger(runtimeCapabilitySnapshot?.probedAt) || null,
   };
