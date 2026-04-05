@@ -80,6 +80,9 @@ test("buildBridgeCapabilities reports bridge protocol envelopes and versions", (
         "bridge/approval/resolve",
         "account/status/read",
         "voice/resolveAuth",
+        "terminal/open",
+        "terminal/write",
+        "terminal/close",
       ],
       features: {
         threadHistory: true,
@@ -91,6 +94,7 @@ test("buildBridgeCapabilities reports bridge protocol envelopes and versions", (
         bridgeCapabilities: true,
         accountStatusRead: true,
         voiceResolveAuth: true,
+        terminalSessions: true,
       },
       bridgeVersion: "1.2.3",
       bridgeLatestVersion: "1.2.9",
@@ -101,6 +105,7 @@ test("buildBridgeCapabilities reports bridge protocol envelopes and versions", (
         threadFork: true,
         accountStatusRead: true,
         voiceResolveAuth: true,
+        terminalSessions: true,
       },
       runtimeCapabilityProbeAt: 123456,
     }
