@@ -15,6 +15,7 @@ struct TurnToolbarContent: ToolbarContent {
     let displayTitle: String
     let navigationContext: TurnThreadNavigationContext?
     let showsThreadActions: Bool
+    let showsTerminalButton: Bool
     let isHandingOffToMac: Bool
     let isStartingNewChat: Bool
     let canHandOffToWorktree: Bool
@@ -31,12 +32,13 @@ struct TurnToolbarContent: ToolbarContent {
     var onTapWorktreeHandoff: (() -> Void)?
     var onTapNewChat: (() -> Void)?
     var onTapRepoDiff: (() -> Void)?
+    var onTapTerminal: (() -> Void)?
     let onGitAction: (TurnGitActionKind) -> Void
 
     @Binding var isShowingPathSheet: Bool
 
     var body: some ToolbarContent {
-        let hasTrailingCluster = repoDiffTotals != nil || showsGitActions
+        let hasTrailingCluster = showsTerminalButton || repoDiffTotals != nil || showsGitActions
         let isThreadActionLoading = isHandingOffToMac || isStartingNewChat
         let canTapMacHandoff = onTapMacHandoff != nil && !isThreadActionLoading
         let canTapWorktreeHandoff = onTapWorktreeHandoff != nil
@@ -126,6 +128,15 @@ struct TurnToolbarContent: ToolbarContent {
             }
         }
 
+        if showsTerminalButton {
+            ToolbarItem(placement: .topBarTrailing) {
+                TurnTerminalToolbarButton {
+                    HapticFeedback.shared.triggerImpactFeedback(style: .light)
+                    onTapTerminal?()
+                }
+            }
+        }
+
         if let repoDiffTotals {
             ToolbarItem(placement: .topBarTrailing) {
                 TurnToolbarDiffTotalsLabel(
@@ -148,6 +159,23 @@ struct TurnToolbarContent: ToolbarContent {
                 )
             }
         }
+    }
+}
+
+private struct TurnTerminalToolbarButton: View {
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            Image(systemName: "terminal")
+                .font(AppFont.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 24, height: 24)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Circle())
+        .adaptiveToolbarItem(in: Circle())
+        .accessibilityLabel("Terminal")
     }
 }
 
