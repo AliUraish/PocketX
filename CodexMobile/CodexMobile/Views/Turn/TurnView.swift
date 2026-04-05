@@ -37,6 +37,7 @@ struct TurnView: View {
     @State private var isVoiceTranscribing = false
     @State private var voiceRecoveryReason: CodexVoiceFailureReason?
     @State private var isShowingVoiceSetupSheet = false
+    @State private var isShowingTerminalPanel = false
     @StateObject private var voiceTranscriptionManager = GPTVoiceTranscriptionManager()
 
     // ─── ENTRY POINT ─────────────────────────────────────────────
@@ -129,6 +130,7 @@ struct TurnView: View {
                 repoDiffTotals: viewModel.gitRepoSync?.repoDiffTotals,
                 isLoadingRepoDiff: isLoadingRepositoryDiff,
                 showsGitActions: showsGitControls,
+                showsTerminalButton: codex.isConnected && codex.supportsBridgeTerminalSessions,
                 isGitActionEnabled: canRunGitAction(
                     isThreadRunning: isThreadRunning,
                     gitWorkingDirectory: gitWorkingDirectory
@@ -149,6 +151,9 @@ struct TurnView: View {
                 onTapRepoDiff: showsGitControls ? {
                     presentRepositoryDiff(workingDirectory: gitWorkingDirectory)
                 } : nil,
+                onTapTerminal: {
+                    isShowingTerminalPanel = true
+                },
                 onGitAction: { action in
                     handleGitActionSelection(
                         action,
@@ -160,44 +165,62 @@ struct TurnView: View {
             )
         }
         .overlay {
-            if isShowingWorktreeHandoff {
-                TurnWorktreeHandoffOverlay(
-                    mode: .handoff,
-                    preferredBaseBranch: preferredWorktreeBaseBranch,
-                    isHandoffAvailable: isWorktreeHandoffAvailable,
-                    isSubmitting: viewModel.isCreatingGitWorktree,
-                    onClose: { isShowingWorktreeHandoff = false },
-                    onSubmit: { branchName, baseBranch in
-                        submitWorktreeHandoff(
-                            branchName: branchName,
-                            baseBranch: baseBranch,
-                            gitWorkingDirectory: gitWorkingDirectory,
-                            activeTurnID: activeTurnID
-                        )
-                    }
-                )
-                .transition(.opacity)
-            }
+            ZStack(alignment: .trailing) {
+                if isShowingWorktreeHandoff {
+                    TurnWorktreeHandoffOverlay(
+                        mode: .handoff,
+                        preferredBaseBranch: preferredWorktreeBaseBranch,
+                        isHandoffAvailable: isWorktreeHandoffAvailable,
+                        isSubmitting: viewModel.isCreatingGitWorktree,
+                        onClose: { isShowingWorktreeHandoff = false },
+                        onSubmit: { branchName, baseBranch in
+                            submitWorktreeHandoff(
+                                branchName: branchName,
+                                baseBranch: baseBranch,
+                                gitWorkingDirectory: gitWorkingDirectory,
+                                activeTurnID: activeTurnID
+                            )
+                        }
+                    )
+                    .transition(.opacity)
+                }
 
-            if isShowingForkWorktree {
-                TurnWorktreeHandoffOverlay(
-                    mode: .fork,
-                    preferredBaseBranch: preferredWorktreeBaseBranch,
-                    isHandoffAvailable: isWorktreeHandoffAvailable,
-                    isSubmitting: viewModel.isCreatingGitWorktree || isForkingThread,
-                    onClose: { isShowingForkWorktree = false },
-                    onSubmit: { branchName, baseBranch in
-                        submitForkIntoNewWorktree(
-                            branchName: branchName,
-                            baseBranch: baseBranch,
-                            gitWorkingDirectory: gitWorkingDirectory,
-                            activeTurnID: activeTurnID
-                        )
-                    }
-                )
-                .transition(.opacity)
+                if isShowingForkWorktree {
+                    TurnWorktreeHandoffOverlay(
+                        mode: .fork,
+                        preferredBaseBranch: preferredWorktreeBaseBranch,
+                        isHandoffAvailable: isWorktreeHandoffAvailable,
+                        isSubmitting: viewModel.isCreatingGitWorktree || isForkingThread,
+                        onClose: { isShowingForkWorktree = false },
+                        onSubmit: { branchName, baseBranch in
+                            submitForkIntoNewWorktree(
+                                branchName: branchName,
+                                baseBranch: baseBranch,
+                                gitWorkingDirectory: gitWorkingDirectory,
+                                activeTurnID: activeTurnID
+                            )
+                        }
+                    )
+                    .transition(.opacity)
+                }
+
+                if isShowingTerminalPanel {
+                    TurnTerminalPanel(
+                        threadID: thread.id,
+                        threadTitle: resolvedThread.displayTitle,
+                        workingDirectory: gitWorkingDirectory,
+                        onDismiss: {
+                            withAnimation(.spring(response: 0.34, dampingFraction: 0.9)) {
+                                isShowingTerminalPanel = false
+                            }
+                        }
+                    )
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .zIndex(10)
+                }
             }
         }
+        .animation(.spring(response: 0.34, dampingFraction: 0.9), value: isShowingTerminalPanel)
         .fullScreenCover(isPresented: isCameraPresentedBinding) {
             CameraImagePicker { data in
                 viewModel.enqueueCapturedImageData(data, codex: codex)
