@@ -360,6 +360,13 @@ extension CodexService {
         ) {
             supportsBridgeTerminalSessions = terminalSessionSupport
         }
+
+        if let terminalRevealSupport = firstBoolValue(
+            in: runtimeCapabilities,
+            keys: ["terminalRevealOnMac", "terminal_reveal_on_mac"]
+        ) {
+            supportsBridgeTerminalRevealOnMac = terminalRevealSupport
+        }
     }
 
     func shouldTreatAsUnsupportedBridgeProtocol(_ error: Error) -> Bool {
