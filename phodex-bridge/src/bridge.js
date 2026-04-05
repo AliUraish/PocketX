@@ -19,6 +19,7 @@ const { printPairingCode } = require("./pairing-code");
 const { rememberActiveThread } = require("./session-state");
 const { handleDesktopRequest } = require("./desktop-handler");
 const { handleGitRequest } = require("./git-handler");
+const { createTerminalHandler } = require("./terminal-handler");
 const { handleThreadContextRequest } = require("./thread-context-handler");
 const { handleWorkspaceRequest } = require("./workspace-handler");
 const { createNotificationsHandler } = require("./notifications-handler");
@@ -101,6 +102,9 @@ function startBridge({
   });
   const notificationsHandler = createNotificationsHandler({
     pushServiceClient,
+  });
+  const terminalHandler = createTerminalHandler({
+    sendNotification: sendApplicationResponse,
   });
   const pushNotificationTracker = createPushNotificationTracker({
     sessionId,
@@ -653,12 +657,14 @@ function startBridge({
     clearReconnectTimer();
     clearRelayWatchdog();
     clearBridgeStatusHeartbeat();
+    terminalHandler.destroyAllSessions();
   }));
   process.on("SIGTERM", () => shutdown(codex, () => socket, () => {
     isShuttingDown = true;
     clearReconnectTimer();
     clearRelayWatchdog();
     clearBridgeStatusHeartbeat();
+    terminalHandler.destroyAllSessions();
   }));
 
   // Routes decrypted app payloads through the same bridge handlers as before.
@@ -682,6 +688,9 @@ function startBridge({
       return;
     }
     if (notificationsHandler.handleNotificationsRequest(rawMessage, sendApplicationResponse)) {
+      return;
+    }
+    if (terminalHandler.handleTerminalRequest(rawMessage, sendApplicationResponse)) {
       return;
     }
     if (handleDesktopRequest(rawMessage, sendApplicationResponse, {
