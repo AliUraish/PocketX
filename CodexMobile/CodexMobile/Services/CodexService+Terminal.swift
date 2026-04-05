@@ -113,6 +113,27 @@ extension CodexService {
         terminalSessionStateByThreadID[normalizedThreadID] = closedState
     }
 
+    func revealTerminalSessionOnMac(forThreadID threadID: String) async throws {
+        let normalizedThreadID = threadID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let state = terminalSessionState(for: normalizedThreadID)
+        guard let sessionID = state.sessionID, state.isRunning else {
+            throw CodexServiceError.invalidInput("Start a terminal session before revealing it on the Mac.")
+        }
+
+        do {
+            _ = try await sendRequest(
+                method: "terminal/revealOnMac",
+                params: .object([
+                    "threadId": .string(normalizedThreadID),
+                    "sessionId": .string(sessionID),
+                ])
+            )
+        } catch {
+            updateTerminalCompatibilityIfNeeded(from: error)
+            throw error
+        }
+    }
+
     func discardTerminalSessionState(forThreadID threadID: String) {
         terminalSessionStateByThreadID.removeValue(forKey: threadID)
     }
@@ -219,7 +240,13 @@ extension CodexService {
         }
 
         if rpcError.code == -32601 || rpcError.message.localizedCaseInsensitiveContains("terminal/") {
-            supportsBridgeTerminalSessions = false
+            let message = rpcError.message.lowercased()
+            if message.contains("revealonmac") || message.contains("reveal on mac") {
+                supportsBridgeTerminalRevealOnMac = false
+            } else {
+                supportsBridgeTerminalSessions = false
+                supportsBridgeTerminalRevealOnMac = false
+            }
         }
     }
 }
