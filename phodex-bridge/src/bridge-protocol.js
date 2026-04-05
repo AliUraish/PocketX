@@ -80,6 +80,9 @@ function buildBridgeCapabilities({
       "bridge/approval/resolve",
       "account/status/read",
       "voice/resolveAuth",
+      "terminal/open",
+      "terminal/write",
+      "terminal/close",
     ]),
     features: {
       threadHistory: true,
@@ -91,6 +94,7 @@ function buildBridgeCapabilities({
       bridgeCapabilities: true,
       accountStatusRead: true,
       voiceResolveAuth: true,
+      terminalSessions: true,
     },
     bridgeVersion: readString(packageVersionStatus?.bridgeVersion) || null,
     bridgeLatestVersion: readString(packageVersionStatus?.bridgeLatestVersion) || null,
@@ -101,6 +105,7 @@ function buildBridgeCapabilities({
       threadFork: readBoolean(runtimeCapabilitySnapshot?.capabilities?.threadFork),
       accountStatusRead: true,
       voiceResolveAuth: true,
+      terminalSessions: true,
     }),
     runtimeCapabilityProbeAt: clampPositiveInteger(runtimeCapabilitySnapshot?.probedAt) || null,
   };
