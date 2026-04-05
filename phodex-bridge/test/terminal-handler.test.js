@@ -8,7 +8,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
 
-const { createTerminalHandler } = require("../src/terminal-handler");
+const { createTerminalHandler, tokenizeTerminalInput } = require("../src/terminal-handler");
 
 function createFakeChildProcess() {
   const child = new EventEmitter();
@@ -186,4 +186,101 @@ test("terminal/close ends the running session and emits closed notification", as
       signal: "SIGHUP",
     },
   });
+});
+
+test("tmux-backed sessions expose reveal-on-mac capability and call osascript", async () => {
+  const responses = [];
+  const execCalls = [];
+
+  const handler = createTerminalHandler({
+    sendNotification() {},
+    execFileImpl: async (command, args) => {
+      execCalls.push([command, args]);
+      return { stdout: "", stderr: "" };
+    },
+    spawnSyncImpl() {
+      return {
+        status: 0,
+        stdout: "/opt/homebrew/bin/tmux\n",
+      };
+    },
+    fsModule: {
+      statSync(targetPath) {
+        if (targetPath.includes("rimcodex-terminal-")) {
+          return { size: 0, isDirectory: () => false };
+        }
+        return {
+          isDirectory() {
+            return true;
+          },
+        };
+      },
+      writeFileSync() {},
+      unlinkSync() {},
+      openSync() { return 1; },
+      readSync() { return 0; },
+      closeSync() {},
+    },
+    osModule: {
+      homedir() {
+        return "/Users/tester";
+      },
+      tmpdir() {
+        return "/tmp";
+      },
+    },
+    pathModule: require("path"),
+    platform: "darwin",
+  });
+
+  assert.deepEqual(handler.getCapabilitySnapshot(), {
+    terminalSessions: true,
+    terminalRevealOnMac: true,
+    terminalTmux: true,
+  });
+
+  handler.handleTerminalRequest(JSON.stringify({
+    id: "open-tmux",
+    method: "terminal/open",
+    params: {
+      threadId: "thread-tmux",
+      cwd: "/tmp/project",
+    },
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const sessionId = responses[0].result?.sessionId;
+
+  handler.handleTerminalRequest(JSON.stringify({
+    id: "reveal-tmux",
+    method: "terminal/revealOnMac",
+    params: {
+      threadId: "thread-tmux",
+      sessionId,
+    },
+  }), (response) => {
+    responses.push(JSON.parse(response));
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(execCalls[0][0], "/opt/homebrew/bin/tmux");
+  assert.equal(execCalls[1][0], "/opt/homebrew/bin/tmux");
+  assert.equal(execCalls[2][0], "osascript");
+  assert.equal(responses[1].result?.revealedOnMac, true);
+});
+
+test("tokenizeTerminalInput maps control bytes and arrows into tmux-friendly tokens", () => {
+  assert.deepEqual(
+    tokenizeTerminalInput("echo hi\n\u0003\u001B[A\t"),
+    [
+      { kind: "literal", value: "echo hi" },
+      { kind: "key", value: "Enter" },
+      { kind: "key", value: "C-c" },
+      { kind: "key", value: "Up" },
+      { kind: "key", value: "Tab" },
+    ]
+  );
 });
