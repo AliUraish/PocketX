@@ -4,9 +4,7 @@
 
 # Pocketex
 
-[![npm version](https://img.shields.io/npm/v/pocketex)](https://www.npmjs.com/package/pocketex)
-[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](LICENSE)
-[Follow on X](https://x.com/emanueledpt)
+[Follow on X](https://x.com/ali_uraish)
 
 Control [Codex](https://openai.com/index/codex/) from your iPhone. Pocketex is a local-first open-source bridge + iOS app that keeps the Codex runtime on your Mac and lets your phone connect through a paired secure session.
 
@@ -467,7 +465,3 @@ Yes. In this repo's supported setup, Tailscale should be installed and active on
 
 **Is the transport layer safe for sensitive work?**
 It is much stronger than a plain text proxy: traffic can be protected in transit with TLS, application payloads are end-to-end encrypted after the secure handshake, and all Codex execution still happens on your Mac. The transport can still observe connection metadata and handshake control messages, so the tightest trust model is to run it yourself.
-
-## License
-
-[ISC](LICENSE)

@@ -1,66 +1,82 @@
 # Contributing to Pocketex
 
-I am not actively accepting contributions right now.
+Contributions are welcome.
 
-This project is very early. Things change fast, priorities shift, and I'm still figuring out the right direction. If you open a PR or issue, there's a good chance I close it, defer it, or never get to it. That's not personal — I just need to stay focused.
+If you want to help make Pocketex better, open an issue, send a PR, and keep changes tight, local-first, and easy to review.
 
-## If you still want to contribute
+## Before You Open a PR
 
-Read this whole file first.
+- Open an issue first for anything non-trivial.
+- Keep the scope narrow. One fix or feature per PR.
+- Explain what changed and why.
+- If you touch UI, include screenshots or a short video.
+- Do not reintroduce hosted-service assumptions, production domains, or remote-only flows.
 
-### What I'm most likely to accept
+## Preferred Contributions
 
-- Small, focused bug fixes
-- Small reliability or performance improvements
-- Typo and documentation fixes
+- Focused bug fixes
+- Reliability improvements
+- Documentation fixes
+- Small performance improvements
+- Local-first UX polish
 
-### What I'm least likely to accept
+## Avoid
 
-- Large PRs
-- Drive-by feature work
-- Opinionated rewrites or refactors
-- Scope expansion I didn't ask for
-
-### Before opening a PR
-
-- **Open an issue first** for anything non-trivial. Describe the problem, not your solution.
-- Keep changes minimal. One fix per PR.
-- Explain exactly what changed and exactly why.
-- If it touches UI, include a screenshot or video.
-
-Opening a PR does not create an obligation on my side. I may close it. I may ignore it. I may take the idea and implement it differently. That's how early-stage projects work.
-
----
+- Large drive-by refactors
+- Unrelated cleanup mixed into feature work
+- Hosted-service defaults in source
+- Regressions to QR pairing, trusted reconnect, or local project routing
 
 ## Local Development Setup
 
 ### Prerequisites
 
-- **Node.js** v18+
-- **[Codex CLI](https://github.com/openai/codex)** installed and working
-- **[Codex desktop app](https://openai.com/index/codex/)** (optional — for viewing threads on Mac)
-- **macOS** (required for desktop refresh; core bridge works on any OS)
-- **Xcode 16+** (only for building the iOS app)
-- **iPhone** with the Pocketex app (or built from source)
+- Node.js 18+
+- [Codex CLI](https://github.com/openai/codex) installed and working
+- Tailscale installed and active on your Mac
+- Tailscale installed and active on your iPhone
+- Xcode 16+
+- macOS for the built-in bridge service and desktop integration
 
-### Bridge setup
+### Clone the Repo
 
 ```sh
-# Clone the repo
-git clone https://github.com/Emanuele-web04/pocketex.git
-cd pocketex
+git clone https://github.com/AliUraish/PocketX.git
+cd PocketX
+```
 
-# Start a local relay + bridge together
+### Build the iOS App
+
+```sh
+cd CodexMobile
+open CodexMobile.xcodeproj
+```
+
+In Xcode:
+
+1. Select your Apple Developer team in Signing & Capabilities.
+2. Choose your iPhone as the run target.
+3. Build and run the app.
+
+The app target is iOS 18.6 and the project is a standalone Xcode project.
+
+### Start the Local Bridge and Relay
+
+From the repo root:
+
+```sh
 ./run-local-pocketex.sh
 ```
 
 This launcher:
-1. Spawns a Codex `app-server` process
-2. Starts a local relay on `/relay/{sessionId}`
-3. Points the bridge at that relay
-4. Prints a QR code in your terminal for the initial trust bootstrap
 
-If you only want the bridge process:
+1. Installs bridge and relay dependencies if needed.
+2. Starts a local relay.
+3. Points the bridge at a Tailscale-reachable host.
+4. Starts `pocketex up`.
+5. Prints a QR code for first-time pairing or recovery.
+
+### Bridge Only
 
 ```sh
 cd phodex-bridge
@@ -68,98 +84,76 @@ npm install
 POCKETEX_RELAY="ws://localhost:9000/relay" npm start
 ```
 
-That runs `pocketex up`, which:
-1. Spawns a Codex `app-server` process
-2. Connects to the configured relay
-3. On macOS, starts the built-in background bridge service
-4. Prints a QR code in your terminal when first-time pairing or recovery is needed
+That runs `pocketex up`.
 
-Scan the QR code with the Pocketex iOS app to trust that Mac.
+### Full Local Test Flow
 
-### iOS app setup
+1. Start `./run-local-pocketex.sh`.
+2. Open the iOS app.
+3. Scan the QR code from inside the app.
+4. Create a thread and send a message.
+5. Verify live responses stream to the phone.
+6. Try git actions from the phone.
+7. Reopen the app and verify trusted reconnect still works.
 
-```sh
-cd CodexMobile
-open CodexMobile.xcodeproj
-```
-
-1. Select your team in **Signing & Capabilities** (you'll need an Apple Developer account)
-2. Pick a target device (physical iPhone or simulator)
-3. Build and run (Cmd+R)
-
-The app uses SwiftUI and the current project target is iOS 18.6. No CocoaPods or SPM dependencies — it's a standalone Xcode project.
-
-### Testing a full local session
-
-1. Start the local launcher: `./run-local-pocketex.sh`
-2. Open the iOS app and scan the QR code
-3. Create a new thread from the app
-4. Send a message — you should see Codex respond in real-time
-5. Try git operations from the phone (commit, push, branch switching)
-6. Reopen the app and verify that the trusted reconnect path is used instead of forcing a fresh QR immediately
-
-### Environment variables
-
-For OSS/local development, prefer the launcher above. If you want to point the bridge at your own relay manually, export `POCKETEX_RELAY` in your shell:
+## Useful Commands
 
 ```sh
-# Connect to an existing Codex instance instead of spawning one
-POCKETEX_CODEX_ENDPOINT=ws://localhost:8080 npm start
+# Start Pocketex
+pocketex up
 
-# Use your own self-hosted relay endpoint (`ws://` is unencrypted)
-POCKETEX_RELAY="ws://localhost:9000/relay" npm start
+# Run the bridge in the foreground
+pocketex run
 
-# Enable auto-refresh of Codex.app on Mac
-POCKETEX_REFRESH_ENABLED=true npm start
+# macOS service controls
+pocketex start
+pocketex restart
+pocketex stop
+pocketex status
+
+# Pairing and thread helpers
+pocketex reset-pairing
+pocketex resume
+pocketex watch
+pocketex --version
 ```
 
-### Project structure
+## Environment Variables
 
-```
-pocketex/
-├── phodex-bridge/          # Node.js CLI bridge (npm package)
-│   ├── bin/pocketex.js      # CLI entrypoint
-│   └── src/
-│       ├── bridge.js               # Core relay + message forwarding
-│       ├── codex-transport.js      # Spawn vs WebSocket abstraction
-│       ├── codex-desktop-refresher.js  # Debounced Codex.app refresh
-│       ├── git-handler.js          # Git command execution from phone
-│       ├── workspace-handler.js    # Workspace/cwd management
-│       ├── session-state.js        # Thread persistence (~/.pocketex/)
-│       ├── rollout-watch.js        # Thread event log tailing
-│       └── qr.js                   # QR code generation
-│
-├── CodexMobile/            # Xcode project root
-│   ├── CodexMobile/        # App source target
-│   │   ├── Services/       # Core services
-│   │   │   ├── CodexService.swift              # Main service coordinator
-│   │   │   ├── CodexService+Connection.swift   # WebSocket connection
-│   │   │   ├── CodexService+Incoming.swift     # Message handling
-│   │   │   ├── CodexService+Messages.swift     # Message composition
-│   │   │   ├── CodexService+History.swift      # Thread history
-│   │   │   ├── CodexService+ThreadsTurns.swift # Thread/turn management
-│   │   │   ├── GitActionsService.swift         # Git operations
-│   │   │   └── AppEnvironment.swift            # Runtime config
-│   │   ├── Views/          # SwiftUI views
-│   │   │   ├── Turn/       # Message timeline + composer
-│   │   │   ├── Sidebar/    # Project/thread navigation
-│   │   │   └── Home/       # Home + onboarding
-│   │   └── Models/         # Data models
-│   ├── CodexMobileTests/   # Unit tests
-│   ├── CodexMobileUITests/ # UI tests
-│   └── BuildSupport/       # Build support files
+```sh
+# Connect to an existing Codex runtime
+POCKETEX_CODEX_ENDPOINT=ws://localhost:8080 pocketex up
+
+# Point at your own relay
+POCKETEX_RELAY="ws://localhost:9000/relay" pocketex up
+
+# Enable Codex.app refresh workaround
+POCKETEX_REFRESH_ENABLED=true pocketex up
 ```
 
-### Code style
+## Project Structure
 
-- **Bridge**: CommonJS, no transpilation, no TypeScript. Keep it simple.
-- **iOS**: SwiftUI, async/await, MainActor isolation. Follow existing patterns.
-- No linter or formatter is enforced — just match what's already there.
+```text
+PocketX/
+├── CodexMobile/             # iOS app, tests, and build support
+├── phodex-bridge/           # Node.js bridge CLI
+├── relay/                   # Self-hosted relay and optional push service
+├── Docs/                    # Extra project docs
+├── SELF_HOSTING_MODEL.md    # Public repo / self-hosting model
+└── run-local-pocketex.sh    # Local launcher for relay + bridge
+```
 
-### Trust model
+## Code Style
 
-- The first QR pairing is possession-based: it contains the relay URL and a live session ID.
-- After that first handshake, the iPhone stores a trusted Mac record and can ask the relay for the Mac's current live session again.
-- Set `POCKETEX_RELAY` to a relay you control when you are not using the local launcher. Use `wss://` when you want TLS in transit.
-- Pocketex uses an authenticated end-to-end encrypted transport after pairing completes. The relay code is public for inspection, but deployed relay details should stay in private config.
-- The built-in daemon / background service path is currently macOS-only. Linux and Windows can still run the bridge, but contributors should treat the daemon logic as platform-specific.
+- Bridge code is CommonJS with no transpilation.
+- iOS code is SwiftUI with async/await and MainActor-oriented patterns.
+- Match the existing style in the surrounding files.
+- Keep shared logic in services or coordinators instead of duplicating it in views.
+
+## Guardrails
+
+- Keep the repo local-first.
+- Do not hardcode hosted relay URLs or production domains.
+- Preserve QR pairing, trusted reconnect, and per-project local context switching.
+- Do not reintroduce repo filtering in the sidebar/content flows.
+- Prefer small, reviewable changes over broad rewrites.
