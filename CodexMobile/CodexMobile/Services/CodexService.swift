@@ -382,6 +382,8 @@ final class CodexService {
     var supportsBridgeVoiceAuth = true
     // Runtime compatibility flag for bridge-owned local terminal sessions.
     var supportsBridgeTerminalSessions = true
+    // Runtime compatibility flag for revealing bridge-owned terminal sessions on the Mac.
+    var supportsBridgeTerminalRevealOnMac = false
     // Runtime compatibility flag for native `thread/fork` conversation branching.
     var supportsThreadFork = true
     // Bridge protocol negotiation state for the bridge-owned mobile API facade.
